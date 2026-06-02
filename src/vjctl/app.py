@@ -19,10 +19,10 @@ from .renderer import Renderer
 from .sources import SimulatedMusicSource, SimulatedSocialSource
 
 METER_HEADER = (
-    "frame scene sage auto lsd lmotif lconf lcert lmargin lshift lpace limpact "
-    "lweight lgrit lspark lspace lmotion energy bass high dens onset change conf "
-    "bpm bphase bconf clock phase tconf trig pressure score dyn lift thit ahit "
-    "baccent aggr mdens\n"
+    "frame scene aphase sage auto lsd lmotif lconf lcert lmargin lshift lpace "
+    "limpact lweight lgrit lspark lspace lmotion energy bass high dens onset "
+    "change conf bpm bphase bconf clock cphase tconf trig pressure score dyn "
+    "lift thit ahit baccent aggr mdens\n"
 )
 
 
@@ -257,6 +257,7 @@ def _meter_line(index: int, frame: MusicFrame, model: VJModel, hit: bool) -> str
     fields = [
         f"{index:05d}",
         model.auto_scene,
+        model.auto_phase,
         f"{model.auto_scene_age:.3f}",
         model.last_auto_effect,
         _lsd_name(model),

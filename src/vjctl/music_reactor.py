@@ -170,6 +170,7 @@ class MusicReaction:
     scene_age: float = 0.0
     pressure: float = 0.0
     trigger_score: float = 0.0
+    phase: str = "rest"
     contrast: float = 0.0
     lift: float = 0.0
     status: str | None = None
@@ -179,6 +180,7 @@ class MusicReaction:
 class MusicDynamics:
     contrast: float = 0.0
     lift: float = 0.0
+    phase: str = "warmup"
 
 
 @dataclass
@@ -197,6 +199,8 @@ class MusicReactor:
     baseline_mass: float = 0.0
     baseline_change: float = 0.0
     dynamics_ready: bool = False
+    last_contrast: float = 0.0
+    last_phase: str = "warmup"
 
     def react(
         self,
@@ -210,6 +214,8 @@ class MusicReactor:
         if frame.confidence < self.tuning.confidence_threshold:
             self.frames_seen = 0
             self.dynamics_ready = False
+            self.last_contrast = 0.0
+            self.last_phase = "warmup"
             self.pressure = _follow(self.pressure, 0.0, _attack(dt, 0.8))
             return MusicReaction(
                 _follow(aggression, DEFAULT_AGGRESSION, 0.05),
@@ -281,6 +287,7 @@ class MusicReactor:
                 scene_age=scene_age,
                 pressure=self.pressure,
                 trigger_score=score,
+                phase=dynamics.phase,
                 contrast=dynamics.contrast,
                 lift=dynamics.lift,
             )
@@ -295,6 +302,7 @@ class MusicReactor:
                 scene_age=scene_age,
                 pressure=self.pressure,
                 trigger_score=score,
+                phase=dynamics.phase,
                 contrast=dynamics.contrast,
                 lift=dynamics.lift,
             )
@@ -311,6 +319,7 @@ class MusicReactor:
             scene_age=scene_age,
             pressure=self.pressure,
             trigger_score=score,
+            phase=dynamics.phase,
             contrast=dynamics.contrast,
             lift=dynamics.lift,
             status=f"MUSIC {scene.upper()}",
@@ -387,7 +396,10 @@ class MusicReactor:
         self.baseline_drive = _baseline(self.baseline_drive, frame.drive, dt)
         self.baseline_mass = _baseline(self.baseline_mass, frame.mass, dt)
         self.baseline_change = _baseline(self.baseline_change, frame.change, dt)
-        return MusicDynamics(contrast, lift)
+        phase = _phase(frame, contrast, lift, self.pressure, self.last_contrast, self.last_phase)
+        self.last_contrast = contrast
+        self.last_phase = phase
+        return MusicDynamics(contrast, lift, phase)
 
     def _effect_key(
         self,
@@ -412,6 +424,7 @@ class MusicReactor:
         if mood is not None:
             threshold += _mood_threshold_shift(mood, scene)
             threshold += _mood_add(mood, "threshold")
+        threshold += _phase_threshold_shift(self.last_phase)
         if scene_entered or scene_age < 0.35:
             threshold = max(0.0, threshold - 0.05 * response)
         if score < threshold:
@@ -596,6 +609,7 @@ def _transition_strength(
     strength = base + pressure * 0.16 + frame.change * 0.10 + frame.bass * 0.06
     strength *= 0.58 + response * 0.42
     strength *= 0.72 + dynamics.contrast * 0.42
+    strength *= _phase_hit_scale(dynamics.phase)
     strength *= _mood_scale(mood, "transition")
     return _clamp(strength)
 
@@ -621,6 +635,45 @@ def _lift(current: float, baseline: float) -> float:
     return _clamp((current - baseline) / max(0.18, 1.0 - baseline))
 
 
+def _phase(
+    frame: MusicFrame,
+    contrast: float,
+    lift: float,
+    pressure: float,
+    previous_contrast: float,
+    previous_phase: str,
+) -> str:
+    if contrast > 0.58 and (frame.onset > 0.50 or frame.change > 0.50):
+        return "hit"
+    if lift > 0.30 or (contrast > 0.26 and contrast >= previous_contrast):
+        return "rise"
+    if previous_phase in ("hit", "rise") and contrast < previous_contrast * 0.55:
+        return "release"
+    if pressure > 0.34 or frame.mass > 0.58:
+        return "hold"
+    return "rest"
+
+
+def _phase_threshold_shift(phase: str) -> float:
+    return {
+        "hit": -0.08,
+        "rise": 0.03,
+        "hold": 0.04,
+        "release": 0.11,
+        "warmup": 0.18,
+    }.get(phase, 0.02)
+
+
+def _phase_hit_scale(phase: str) -> float:
+    return {
+        "hit": 1.16,
+        "rise": 0.94,
+        "hold": 0.86,
+        "release": 0.72,
+        "warmup": 0.62,
+    }.get(phase, 0.82)
+
+
 def _scene(
     frame: MusicFrame,
     pressure: float,
@@ -629,6 +682,9 @@ def _scene(
     dynamics: MusicDynamics = MusicDynamics(),
 ) -> str:
     restraint = 1.0 - response
+    if dynamics.phase == "warmup":
+        scene = "drive" if frame.drive > 0.55 or pressure > 0.38 else "listen"
+        return _mood_scene(scene, frame, pressure, mood)
     context = 1.0 - dynamics.contrast
     rupture_change = 0.72 + restraint * 0.14 + context * 0.08
     rupture_onset = 0.62 + restraint * 0.10 + context * 0.06
@@ -637,6 +693,14 @@ def _scene(
     weight_mass = 0.58 + restraint * 0.08 + context * 0.03
     drive_amount = 0.42 + restraint * 0.10 + context * 0.04
     drive_pressure = 0.38 + restraint * 0.10 + context * 0.03
+    if dynamics.phase == "hit":
+        rupture_change -= 0.08
+        rupture_onset -= 0.06
+        chaos_pressure -= 0.04
+    elif dynamics.phase == "release":
+        rupture_change += 0.08
+        rupture_onset += 0.08
+        chaos_pressure += 0.08
     scene = "listen"
     if frame.change > rupture_change and frame.onset > rupture_onset:
         scene = "rupture"
@@ -695,7 +759,10 @@ def _trigger_score(
             + frame.change * (0.10 + response * 0.08),
         )
     )
-    return _clamp(score * (0.62 + dynamics.contrast * 0.54) + dynamics.lift * 0.18)
+    score *= 0.62 + dynamics.contrast * 0.54
+    score += dynamics.lift * 0.18
+    score *= _phase_hit_scale(dynamics.phase)
+    return _clamp(score)
 
 
 def _wave_strength(
@@ -708,6 +775,7 @@ def _wave_strength(
     floor = 0.24 + response * 0.10
     strength = max(floor, raw * (0.56 + response * 0.44))
     strength *= 0.70 + dynamics.contrast * 0.50
+    strength *= _phase_hit_scale(dynamics.phase)
     return _clamp(strength * _mood_scale(mood, "wave"))
 
 

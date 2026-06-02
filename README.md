@@ -169,6 +169,9 @@ The model uses those values in two ways:
 - `MusicReactor` also tracks local dynamics. It compares the current frame
   against a slow baseline, so AutoVJ reacts to contrast inside the current track
   instead of treating every loud normalized input as a drop.
+- That local contrast is classified into energy phases: `warmup`, `rest`,
+  `rise`, `hit`, `hold`, and `release`. Hits can open stronger waves and
+  transitions, while release raises the gate so the show breathes after impact.
 - `TempoClock` accepts confident audio BPM/phase hints while still respecting
   manual lock.
 - `LsdDirector` classifies the musical climate when `--lsd` is enabled and
@@ -202,6 +205,8 @@ into rupture or chaos.
 Local dynamics add another restraint layer: sustained loud sections can hold
 pressure, but automatic hits need contrast or lift relative to the recent
 baseline before they escalate.
+Energy phases then shape the decision: `rise` can build pressure, `hit` can
+fire hard, and `release` resists immediate follow-up effects.
 
 `0` stays manual. It is the operator's free-roam reset, not an automatic music
 decision.
@@ -245,7 +250,7 @@ vjctl --meter
 vjctl --music demo --meter
 ```
 
-Columns include scene, scene age, latest automatic effect, audio features,
+Columns include scene, energy phase, scene age, latest automatic effect, audio features,
 beat/phase estimates, clock phase, timing confidence, trigger decisions,
 pressure, trigger score, local dynamic contrast, local lift, transition hit
 strength, aftershock strength, beat accent, aggression, density, LSD profile,

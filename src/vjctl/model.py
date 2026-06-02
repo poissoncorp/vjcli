@@ -88,6 +88,7 @@ class VJModel:
     status: str = "vjctl realm"
     auto_scene: str = "idle"
     auto_scene_age: float = 0.0
+    auto_phase: str = "rest"
     auto_pressure: float = 0.0
     auto_score: float = 0.0
     auto_contrast: float = 0.0
@@ -234,6 +235,7 @@ class VJModel:
         self.density = reaction.density
         self.auto_scene = reaction.scene
         self.auto_scene_age = reaction.scene_age
+        self.auto_phase = reaction.phase
         self.auto_pressure = reaction.pressure
         self.auto_score = reaction.trigger_score
         self.auto_contrast = reaction.contrast

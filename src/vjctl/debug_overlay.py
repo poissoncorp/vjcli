@@ -43,7 +43,8 @@ def _debug_lines(model: VJModel, now: float) -> list[str]:
             f"B{model.beat_accent:.2f} WAVES {len(model.waves)}"
         ),
         (
-            f"SCENE {model.auto_scene.upper()} T{model.auto_scene_age:.1f} "
+            f"SCENE {model.auto_scene.upper()} {model.auto_phase.upper()} "
+            f"T{model.auto_scene_age:.1f} "
             f"P{model.auto_pressure:.2f} S{model.auto_score:.2f} "
             f"D{model.auto_contrast:.2f} L{model.auto_lift:.2f} "
             f"H{model.auto_transition_strength:.2f} K{model.auto_hit:.2f}"
