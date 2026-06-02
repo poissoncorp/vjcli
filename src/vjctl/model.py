@@ -12,6 +12,13 @@ DEFAULT_AGGRESSION = 0.10
 DEFAULT_DENSITY = 0.10
 
 
+@dataclass(frozen=True)
+class MusicTuning:
+    confidence_threshold: float = 0.08
+    onset_threshold: float = 0.58
+    onset_debounce: float = 0.12
+
+
 @dataclass
 class Overlay:
     text: str
@@ -76,6 +83,7 @@ class VJModel:
     socials: list[SocialEvent] = field(default_factory=list)
     waves: list[Wave] = field(default_factory=list)
     music: MusicFrame = field(default_factory=MusicFrame)
+    music_tuning: MusicTuning = field(default_factory=MusicTuning)
     effects: dict[str, HoldEffect] = field(
         default_factory=lambda: {effect.name: HoldEffect(effect.name) for effect in EFFECTS}
     )
@@ -162,13 +170,15 @@ class VJModel:
 
     def apply_music(self, frame: MusicFrame, now: float) -> None:
         self.music = frame
-        if frame.confidence < 0.08:
+        if frame.confidence < self.music_tuning.confidence_threshold:
             self.aggression = _follow(self.aggression, DEFAULT_AGGRESSION, 0.05)
             self.density = _follow(self.density, DEFAULT_DENSITY, 0.05)
             return
         self.aggression = _clamp(max(DEFAULT_AGGRESSION, DEFAULT_AGGRESSION + frame.drive * 0.84))
         self.density = _clamp(max(DEFAULT_DENSITY, DEFAULT_DENSITY + frame.mass * 0.62))
-        if frame.onset < 0.58 or now - self.last_music_onset_at < 0.12:
+        if frame.onset < self.music_tuning.onset_threshold:
+            return
+        if now - self.last_music_onset_at < self.music_tuning.onset_debounce:
             return
         strength = _clamp(max(0.34, frame.onset * 0.82 + frame.bass * 0.28 + frame.change * 0.18))
         self._spawn_wave(now, strength)

@@ -12,7 +12,7 @@ from .ansi import ALT_SCREEN, CLEAR, HIDE_CURSOR, MAIN_SCREEN, RESET, SHOW_CURSO
 from .audio_input import AudioInputSource
 from .effects import EFFECT_BY_KEY
 from .input import InputDecoder, InputEvent
-from .model import VJModel
+from .model import MusicTuning, VJModel
 from .music import MusicFrame, MusicSource
 from .renderer import Renderer
 from .sources import SimulatedMusicSource, SimulatedSocialSource
@@ -37,7 +37,11 @@ class TerminalSession:
             termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original)
 
 
-def run(music: str = "none", audio_device: str | int | None = None) -> int:
+def run(
+    music: str = "none",
+    audio_device: str | int | None = None,
+    music_tuning: MusicTuning | None = None,
+) -> int:
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         sys.stderr.write(
             "vjctl needs an interactive terminal. Use --preview-frames for text preview.\n"
@@ -49,7 +53,7 @@ def run(music: str = "none", audio_device: str | int | None = None) -> int:
         sys.stderr.write(f"{error}\n")
         return 2
 
-    model = VJModel()
+    model = VJModel(music_tuning=music_tuning or MusicTuning())
     renderer = Renderer()
     decoder = InputDecoder()
     social_source = SimulatedSocialSource()
@@ -92,8 +96,15 @@ def run(music: str = "none", audio_device: str | int | None = None) -> int:
         _close_source(music_source)
 
 
-def render_preview(frames: int, width: int, height: int, fps: int = 12, music: str = "none") -> str:
-    model = VJModel()
+def render_preview(
+    frames: int,
+    width: int,
+    height: int,
+    fps: int = 12,
+    music: str = "none",
+    music_tuning: MusicTuning | None = None,
+) -> str:
+    model = VJModel(music_tuning=music_tuning or MusicTuning())
     renderer = Renderer()
     social_source = SimulatedSocialSource()
     music_source = _music_source(music if music == "demo" else "none")
@@ -122,6 +133,7 @@ def run_meter(
     audio_device: str | int | None = None,
     frames: int = 120,
     fps: int = 20,
+    music_tuning: MusicTuning | None = None,
 ) -> int:
     if music == "none":
         sys.stderr.write("Choose --music demo or --music audio for meter.\n")
@@ -133,7 +145,7 @@ def run_meter(
         return 2
     if source is None:
         return 2
-    model = VJModel()
+    model = VJModel(music_tuning=music_tuning or MusicTuning())
     interval = 1.0 / max(1, fps)
     next_at = time.monotonic()
     sys.stdout.write("frame energy bass high dens onset change conf trig aggr mdens\n")

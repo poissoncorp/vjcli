@@ -3,8 +3,9 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .app import render_preview, run, run_meter
 from .audio_input import audio_device_lines
+from .app import render_preview, run, run_meter
+from .model import MusicTuning
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -15,6 +16,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--meter", action="store_true")
     parser.add_argument("--meter-frames", type=int, default=120, help=argparse.SUPPRESS)
     parser.add_argument("--meter-fps", type=int, default=20, help=argparse.SUPPRESS)
+    parser.add_argument("--confidence-threshold", type=float, default=0.08)
+    parser.add_argument("--onset-threshold", type=float, default=0.58)
+    parser.add_argument("--onset-debounce", type=float, default=0.12)
     parser.add_argument("--preview-frames", type=int, default=0, help=argparse.SUPPRESS)
     parser.add_argument("--width", type=int, default=132, help=argparse.SUPPRESS)
     parser.add_argument("--height", type=int, default=36, help=argparse.SUPPRESS)
@@ -23,17 +27,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    tuning = _music_tuning(args)
     if args.list_audio_devices:
         return _list_audio_devices()
     if args.meter:
         device = _audio_device(args.audio_device)
-        return run_meter(args.music, device, args.meter_frames, args.meter_fps)
+        return run_meter(args.music, device, args.meter_frames, args.meter_fps, tuning)
     if args.preview_frames > 0:
         sys.stdout.write(
-            render_preview(args.preview_frames, args.width, args.height, music=args.music)
+            render_preview(
+                args.preview_frames,
+                args.width,
+                args.height,
+                music=args.music,
+                music_tuning=tuning,
+            )
         )
         return 0
-    return run(args.music, _audio_device(args.audio_device))
+    return run(args.music, _audio_device(args.audio_device), tuning)
 
 
 def _audio_device(value: str | None) -> str | int | None:
@@ -42,6 +53,18 @@ def _audio_device(value: str | None) -> str | int | None:
     if value.isdigit():
         return int(value)
     return value
+
+
+def _music_tuning(args: argparse.Namespace) -> MusicTuning:
+    return MusicTuning(
+        confidence_threshold=_amount(args.confidence_threshold),
+        onset_threshold=_amount(args.onset_threshold),
+        onset_debounce=max(0.0, float(args.onset_debounce)),
+    )
+
+
+def _amount(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
 
 
 def _list_audio_devices() -> int:

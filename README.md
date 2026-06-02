@@ -44,6 +44,7 @@ For live audio input:
 python3 -m pip install -e '.[audio]'
 vjctl --list-audio-devices
 vjctl --music audio --meter
+vjctl --music audio --meter --onset-threshold 0.50 --onset-debounce 0.16
 vjctl --music audio
 ```
 
