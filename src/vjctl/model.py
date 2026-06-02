@@ -7,6 +7,7 @@ from .clock import TempoClock
 from .effects import EFFECTS, EFFECT_BY_KEY
 from .events import SocialIncoming
 from .music import MusicFrame
+from .timing import TimingState
 
 DEFAULT_AGGRESSION = 0.10
 DEFAULT_DENSITY = 0.10
@@ -94,8 +95,9 @@ class VJModel:
 
     def update(self, dt: float, now: float) -> bool:
         beat = self.clock.update(dt)
-        beat_time = self.beat_time
-        beat_dt = max(0.0, dt * (self.clock.bpm / 60.0))
+        timing = self.timing
+        beat_time = timing.beat_time
+        beat_dt = max(0.0, dt * (timing.bpm / 60.0))
         if beat:
             self._spawn_wave(now, self.effective_aggression)
 
@@ -119,7 +121,11 @@ class VJModel:
 
     @property
     def beat_time(self) -> float:
-        return self.clock.beat_time
+        return self.timing.beat_time
+
+    @property
+    def timing(self) -> TimingState:
+        return self.clock.state
 
     def text_input(self, char: str) -> None:
         if char == "\b":
@@ -282,7 +288,7 @@ class VJModel:
     def _spawn_wave(self, now: float, strength: float, offset_beats: float = 0.0) -> None:
         aggression = self.effective_aggression
         density = self.effective_density
-        beat_seconds = 60.0 / max(1.0, self.clock.bpm)
+        beat_seconds = 60.0 / max(1.0, self.timing.bpm)
         lifetime_beats = max(0.82, 3.0 - aggression * 1.55)
         born_at = now + offset_beats * beat_seconds
         lifetime = lifetime_beats * beat_seconds

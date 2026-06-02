@@ -114,8 +114,9 @@ class TextLayer:
     def hud(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
         if buffer.width < 82 or buffer.height < 20:
             return
-        mode = "LOCK" if model.clock.locked else "FREE"
-        bpm = round(model.clock.bpm)
+        timing = model.timing
+        mode = "LOCK" if timing.locked else timing.source.upper()
+        bpm = round(timing.bpm)
         self._plain.render(
             buffer,
             f"{mode} {bpm}",

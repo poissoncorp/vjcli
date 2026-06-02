@@ -14,6 +14,7 @@ opening a browser or a heavyweight visual stack.
 - Looks best in Ghostty.
 - Responds instantly to keyboard performance.
 - Starts in free roam, then locks to BPM after four steady taps.
+- Lets confident audio beat estimates guide the free clock without taking over manual lock.
 - Keeps spawned waves travelling even after you reset back to free roam.
 - Uses real ANSI/text rendering instead of a web canvas.
 - Ships with simulated social events so the stage can feel alive before real adapters exist.

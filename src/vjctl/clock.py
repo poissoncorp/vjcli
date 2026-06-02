@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .timing import TIMING_AUDIO, TIMING_FREE, TIMING_MANUAL, TimingState
+
 
 @dataclass
 class TempoClock:
@@ -10,6 +12,8 @@ class TempoClock:
     phase: float = 0.0
     beat_index: int = 0
     locked: bool = False
+    source: str = TIMING_FREE
+    confidence: float = 0.0
     lock_rate: float = 2.8
     _tap_group: list[float] = field(default_factory=list)
     _last_tap: float | None = None
@@ -18,6 +22,18 @@ class TempoClock:
     def beat_time(self) -> float:
         return self.beat_index + self.phase
 
+    @property
+    def state(self) -> TimingState:
+        return TimingState(
+            source=self.source,
+            bpm=self.bpm,
+            target_bpm=self.target_bpm,
+            phase=self.phase,
+            beat_time=self.beat_time,
+            confidence=self.confidence,
+            locked=self.locked,
+        )
+
     def update(self, dt: float) -> bool:
         dt = max(0.0, dt)
         if self.bpm != self.target_bpm:
@@ -25,6 +41,11 @@ class TempoClock:
             self.bpm += (self.target_bpm - self.bpm) * blend
             if abs(self.bpm - self.target_bpm) < 0.01:
                 self.bpm = self.target_bpm
+        if not self.locked and self.confidence > 0.0:
+            self.confidence = max(0.0, self.confidence - dt * 0.35)
+            if self.confidence <= 0.01:
+                self.confidence = 0.0
+                self.source = TIMING_FREE
 
         previous = self.phase
         self.phase = (self.phase + dt * (self.bpm / 60.0)) % 1.0
@@ -52,6 +73,8 @@ class TempoClock:
         candidate = _clamp_bpm(60.0 / avg)
         self.target_bpm = candidate
         self.locked = True
+        self.source = TIMING_MANUAL
+        self.confidence = 1.0
         if self.phase > 0.0:
             self.beat_index += 1
         self.phase = 0.0
@@ -66,6 +89,8 @@ class TempoClock:
         target = _clamp_bpm(bpm)
         amount = min(0.18, max(0.04, confidence * 0.14))
         self.target_bpm += (target - self.target_bpm) * amount
+        self.source = TIMING_AUDIO
+        self.confidence = max(self.confidence, confidence)
 
     def jog(self, amount: float) -> None:
         self.phase += amount
@@ -78,6 +103,8 @@ class TempoClock:
 
     def free_roam(self) -> None:
         self.locked = False
+        self.source = TIMING_FREE
+        self.confidence = 0.0
         self.phase = 0.0
         self.beat_index = 0
         self._tap_group.clear()
