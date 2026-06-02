@@ -6,6 +6,8 @@ from threading import Lock
 from .analyzer import AudioAnalyzer
 from .music import MusicFrame
 
+INSTALL_AUDIO_MESSAGE = "Install audio support with `python3 -m pip install -e .[audio]`."
+
 
 class AudioInputSource:
     def __init__(
@@ -17,8 +19,7 @@ class AudioInputSource:
         try:
             import sounddevice
         except ImportError as exc:
-            message = "Install audio support with `python3 -m pip install -e .[audio]`."
-            raise RuntimeError(message) from exc
+            raise RuntimeError(INSTALL_AUDIO_MESSAGE) from exc
         self.sample_rate = sample_rate
         self.samples: deque[float] = deque(maxlen=sample_rate)
         self.lock = Lock()
@@ -50,3 +51,20 @@ class AudioInputSource:
         with self.lock:
             for frame in indata:
                 self.samples.append(float(frame[0]))
+
+
+def audio_device_lines() -> list[str]:
+    try:
+        import sounddevice
+    except ImportError as exc:
+        raise RuntimeError(INSTALL_AUDIO_MESSAGE) from exc
+    devices = sounddevice.query_devices()
+    lines: list[str] = []
+    for index, device in enumerate(devices):
+        inputs = int(device.get("max_input_channels", 0))
+        if inputs <= 0:
+            continue
+        name = str(device.get("name", "unknown"))
+        rate = round(float(device.get("default_samplerate", 0.0)))
+        lines.append(f"{index}: {name} ({inputs} in, {rate} Hz)")
+    return lines

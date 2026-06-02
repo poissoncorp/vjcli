@@ -42,6 +42,7 @@ For live audio input:
 
 ```bash
 python3 -m pip install -e '.[audio]'
+vjctl --list-audio-devices
 vjctl --music audio
 ```
 
