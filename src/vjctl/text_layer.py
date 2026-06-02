@@ -4,81 +4,41 @@ from .buffer import FrameBuffer
 from .model import VJModel
 from .noise import grain
 from .palette import ASH, BLACK, DEEP_RED, RED, Color
+from .text_art import choose_art
 
 PIXEL = "█"
 
 
-class TextLayer:
-    def social(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
-        for event in model.socials:
-            text = f"{event.nick} {'FOLLOW' if event.kind == 'follow' else '<3'}".upper()
-            text = _clip(text, max(18, min(buffer.width // 3, 44)))
-            width = len(text)
-            x = round(buffer.width * event.x) - width // 2
-            y = round(buffer.height * event.y)
-            top = 4 if buffer.height >= 18 else 0
-            bottom = max(top, buffer.height - 2)
-            x = max(0, min(buffer.width - width, x))
-            y = max(top, min(bottom, y))
-            color = RED if event.kind == "follow" else ASH
-            self.write_plain(buffer, text, x, y, color, "minor")
-
-    def overlays(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
-        if not model.overlays:
-            return
-        overlay = model.overlays[-1]
-        text = _clip(overlay.text, max(8, buffer.width - 8))
-        x = max(0, (buffer.width - len(text)) // 2)
-        y = max(2, buffer.height // 2)
-        color = ASH if overlay.kind == "system" else RED
-        self.write_plain(buffer, text, x, y, color, "prompt")
-
-    def prompt(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
-        if not model.prompt:
-            return
-        text = _clip(model.prompt, max(8, buffer.width - 8))
-        x = max(0, (buffer.width - len(text)) // 2)
-        y = min(buffer.height - 3, max(2, buffer.height // 2 + 2))
-        color = RED if model.prompt.startswith("/") else ASH
-        self.write_plain(buffer, text, x, y, color, "prompt")
-
-    def hud(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
-        if buffer.width < 82 or buffer.height < 20:
-            return
-        mode = "LOCK" if model.clock.locked else "FREE"
-        bpm = round(model.clock.bpm)
-        self.write_plain(
-            buffer,
-            f"{mode} {bpm}",
-            buffer.width - len(f"{mode} {bpm}") - 2,
-            0,
-            RED,
-            "minor",
-        )
-        if model.prompt or model.overlays or model.socials or buffer.height < 28:
-            return
-        meters = f"A{round(model.effective_aggression * 100):02d} D{round(model.effective_density * 100):02d}"
-        self.write_plain(
-            buffer,
-            meters,
-            buffer.width - len(meters) - 2,
-            3,
-            RED,
-            "minor",
-        )
-
-    def write_plain(
+class PlainText:
+    def render(
         self,
         buffer: FrameBuffer,
         text: str,
         x: int,
         y: int,
         color: Color,
-        mode: str = "prompt",
+        minor: bool = False,
     ) -> None:
-        buffer.write_text(x, y, text, fg=color, bold=mode != "minor", dim=mode == "minor")
+        buffer.write_text(x, y, text, fg=color, bold=not minor, dim=minor)
 
-    def write_lines(
+
+class ArtText:
+    def render_text(
+        self,
+        buffer: FrameBuffer,
+        text: str,
+        color: Color,
+        model: VJModel,
+        beat_time: float,
+        mode: str = "hero",
+    ) -> None:
+        lines = choose_art(text, max(8, buffer.width - 8), max(5, buffer.height - 6))
+        width = max(len(line) for line in lines)
+        x = max(0, (buffer.width - width) // 2)
+        y = max(2, (buffer.height - len(lines)) // 2)
+        self.render_lines(buffer, lines, x, y, color, model, beat_time, mode)
+
+    def render_lines(
         self,
         buffer: FrameBuffer,
         lines: list[str],
@@ -104,6 +64,87 @@ class TextLayer:
         _pixel_layer(buffer, lines, x + 1 + round(split * 4), y, RED, salt + 7, split * 0.55, True)
         _pixel_layer(buffer, lines, x + 1, y - 1, ASH, salt + 11, split * 0.28, True)
         _pixel_layer(buffer, lines, x, y, color, salt, damage, False)
+
+
+class TextLayer:
+    def __init__(self) -> None:
+        self._plain = PlainText()
+        self._art = ArtText()
+
+    def social(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
+        for event in model.socials:
+            text = f"{event.nick} {'FOLLOW' if event.kind == 'follow' else '<3'}".upper()
+            text = _clip(text, max(18, min(buffer.width // 3, 44)))
+            width = len(text)
+            x = round(buffer.width * event.x) - width // 2
+            y = round(buffer.height * event.y)
+            top = 4 if buffer.height >= 18 else 0
+            bottom = max(top, buffer.height - 2)
+            x = max(0, min(buffer.width - width, x))
+            y = max(top, min(bottom, y))
+            color = RED if event.kind == "follow" else ASH
+            self._plain.render(buffer, text, x, y, color, True)
+
+    def overlays(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
+        if not model.overlays:
+            return
+        overlay = model.overlays[-1]
+        color = ASH if overlay.kind == "system" else RED
+        if overlay.kind == "system":
+            text = _clip(overlay.text, max(8, buffer.width - 8))
+            x = max(0, (buffer.width - len(text)) // 2)
+            y = max(2, buffer.height // 2)
+            self._plain.render(buffer, text, x, y, color)
+            return
+        self._art.render_text(buffer, overlay.text, color, model, beat_time)
+
+    def prompt(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
+        if not model.prompt:
+            return
+        text = _clip(model.prompt, max(8, buffer.width - 8))
+        x = max(0, (buffer.width - len(text)) // 2)
+        y = min(buffer.height - 3, max(2, buffer.height // 2 + 2))
+        color = RED if model.prompt.startswith("/") else ASH
+        self._plain.render(buffer, text, x, y, color)
+
+    def hud(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
+        if buffer.width < 82 or buffer.height < 20:
+            return
+        mode = "LOCK" if model.clock.locked else "FREE"
+        bpm = round(model.clock.bpm)
+        self._plain.render(
+            buffer,
+            f"{mode} {bpm}",
+            buffer.width - len(f"{mode} {bpm}") - 2,
+            0,
+            RED,
+            True,
+        )
+        if model.prompt or model.overlays or model.socials or buffer.height < 28:
+            return
+        meters = f"A{round(model.effective_aggression * 100):02d} D{round(model.effective_density * 100):02d}"
+        self._plain.render(
+            buffer,
+            meters,
+            buffer.width - len(meters) - 2,
+            3,
+            RED,
+            True,
+        )
+
+    def write_lines(
+        self,
+        buffer: FrameBuffer,
+        lines: list[str],
+        x: int,
+        y: int,
+        color: Color,
+        model: VJModel,
+        beat_time: float,
+        mode: str = "hero",
+        knockout: bool = True,
+    ) -> None:
+        self._art.render_lines(buffer, lines, x, y, color, model, beat_time, mode, knockout)
 
 
 def _knockout(buffer: FrameBuffer, lines: list[str], x: int, y: int) -> None:
