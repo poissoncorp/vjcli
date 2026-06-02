@@ -121,6 +121,15 @@ class VJModel:
         return max(0.0, min(1.0, self.density * (1.0 - self.cooldown)))
 
     @property
+    def beat_accent(self) -> float:
+        timing = self.timing
+        clock_weight = 1.0 if timing.locked else timing.confidence
+        clock = max(0.0, 1.0 - timing.phase * 8.0) * clock_weight
+        audio_weight = max(self.music.confidence, self.music.beat_confidence)
+        audio = self.music.onset * audio_weight * 0.62
+        return max(0.0, min(1.0, max(clock, audio)))
+
+    @property
     def beat_time(self) -> float:
         return self.timing.beat_time
 

@@ -11,7 +11,13 @@ class SceneRenderer:
         if model.cooldown > 0.92:
             return
         scene = model.auto_scene
-        pressure = max(model.auto_pressure, model.music.energy * 0.08, model.auto_hit * 0.54)
+        beat = model.beat_accent
+        pressure = max(
+            model.auto_pressure,
+            model.music.energy * 0.08,
+            model.auto_hit * 0.54,
+            beat * 0.34,
+        )
         if scene in ("idle", "listen"):
             self._listen(buffer, model, beat_time, pressure)
         elif scene == "drive":
@@ -24,6 +30,7 @@ class SceneRenderer:
             self._rupture(buffer, model, beat_time, pressure)
         elif scene == "chaos":
             self._chaos(buffer, model, beat_time, pressure)
+        self._beat_stress(buffer, model, beat_time, beat)
         self._aftershock(buffer, model, beat_time)
 
     def _listen(
@@ -162,6 +169,36 @@ class SceneRenderer:
             char = "|" if hit > 0.58 else ":"
             buffer.write_cell(inset, y, char, fg=RED, dim=hit < 0.5)
             buffer.write_cell(buffer.width - inset - 1, y, char, fg=RED, dim=hit < 0.5)
+
+    def _beat_stress(
+        self,
+        buffer: FrameBuffer,
+        model: VJModel,
+        beat_time: float,
+        beat: float,
+    ) -> None:
+        if beat < 0.08 or model.auto_scene in ("idle", "listen"):
+            return
+        salt = round(beat_time * 8)
+        span = round(buffer.width * (0.10 + beat * 0.20))
+        center = buffer.width // 2
+        rows = (buffer.height // 3, buffer.height - buffer.height // 3)
+        for row in rows:
+            drift = grain(row, salt, 67) % 7 - 3
+            for x in range(center - span, center + span, 3):
+                if grain(x, row, salt) % 100 > 42 + beat * 38:
+                    continue
+                char = "=" if beat > 0.42 else "-"
+                buffer.write_cell(x + drift, row, char, fg=RED, bold=beat > 0.68)
+
+        if beat < 0.32:
+            return
+        edge = max(1, round(buffer.width * 0.018))
+        for y in range(2, buffer.height - 2, 4):
+            if grain(y, salt, 71) % 100 > 46 + beat * 24:
+                continue
+            buffer.write_cell(edge, y, ":", fg=ASH, dim=beat < 0.64)
+            buffer.write_cell(buffer.width - edge - 1, y, ":", fg=ASH, dim=beat < 0.64)
 
     def _rail(
         self,
