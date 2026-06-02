@@ -4,7 +4,7 @@ import random
 from dataclasses import dataclass, field
 
 from .clock import TempoClock
-from .effects import EFFECTS, EFFECT_BY_KEY
+from .effects import EFFECTS, EFFECT_BY_KEY, EffectSpec
 from .events import SocialIncoming
 from .music import MusicFrame
 from .music_reactor import DEFAULT_AGGRESSION, DEFAULT_DENSITY, MusicReactor
@@ -70,6 +70,7 @@ class VJModel:
     clock: TempoClock = field(default_factory=TempoClock)
     aggression: float = DEFAULT_AGGRESSION
     density: float = DEFAULT_DENSITY
+    debug: bool = False
     prompt: str = ""
     overlays: list[Overlay] = field(default_factory=list)
     socials: list[SocialEvent] = field(default_factory=list)
@@ -81,6 +82,8 @@ class VJModel:
     )
     cooldown: float = 0.0
     status: str = "vjctl realm"
+    last_auto_effect: str = "-"
+    last_auto_effect_at: float = -999.0
     rng: random.Random = field(default_factory=lambda: random.Random(901507))
 
     def update(self, dt: float, now: float) -> bool:
@@ -170,13 +173,18 @@ class VJModel:
         reaction = self.music_reactor.react(frame, now, self.aggression, self.density)
         self.aggression = reaction.aggression
         self.density = reaction.density
-        if reaction.wave_strength is None:
+        if reaction.wave_strength is not None:
+            self._spawn_wave(now, reaction.wave_strength)
+        if reaction.effect_key is not None:
+            self._trigger_key(reaction.effect_key, now, True)
             return
-        self._spawn_wave(now, reaction.wave_strength)
         if reaction.status is not None:
             self.status = reaction.status
 
     def hold(self, key_id: str, now: float = 0.0) -> None:
+        self._trigger_key(key_id, now, False)
+
+    def _trigger_key(self, key_id: str, now: float, auto: bool) -> None:
         spec = EFFECT_BY_KEY.get(key_id)
         if spec is None:
             return
@@ -185,7 +193,7 @@ class VJModel:
             return
         if spec.cooldown > 0.0:
             self.cooldown = max(self.cooldown, spec.cooldown)
-            self.status = spec.label
+            self._set_effect_status(spec, now, auto)
             return
         beat_time = self.beat_time
         effect = self.effects.get(spec.name)
@@ -194,7 +202,15 @@ class VJModel:
         effect.trigger(beat_time, spec.hold_beats, spec.release)
         for pulse in spec.pulses:
             self._spawn_wave(now, max(0.4, spec.release, spec.level / 10.0), pulse)
-        self.status = spec.label
+        self._set_effect_status(spec, now, auto)
+
+    def _set_effect_status(self, spec: EffectSpec, now: float, auto: bool) -> None:
+        if not auto:
+            self.status = spec.label
+            return
+        self.last_auto_effect = f"{spec.key}:{spec.label}"
+        self.last_auto_effect_at = now
+        self.status = f"AUTO {spec.label}"
 
     def tap(self, now: float) -> None:
         candidate = self.clock.tap(now)

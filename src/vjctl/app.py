@@ -47,6 +47,7 @@ def run(
     music: str = "audio",
     audio_device: str | int | None = None,
     music_tuning: MusicTuning | None = None,
+    debug: bool = False,
 ) -> int:
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         sys.stderr.write(
@@ -59,7 +60,7 @@ def run(
         sys.stderr.write(f"{error}\n")
         return 2
 
-    model = _model(music_tuning)
+    model = _model(music_tuning, debug)
     renderer = Renderer()
     decoder = InputDecoder()
     social_source = SimulatedSocialSource()
@@ -109,8 +110,9 @@ def render_preview(
     fps: int = 12,
     music: str = "demo",
     music_tuning: MusicTuning | None = None,
+    debug: bool = False,
 ) -> str:
-    model = _model(music_tuning)
+    model = _model(music_tuning, debug)
     renderer = Renderer()
     social_source = SimulatedSocialSource()
     music_source = _music_source(music if music == "demo" else "none")
@@ -187,8 +189,8 @@ def _close_source(source: MusicSource | None) -> None:
         close()
 
 
-def _model(music_tuning: MusicTuning | None = None) -> VJModel:
-    return VJModel(music_reactor=MusicReactor(music_tuning or MusicTuning()))
+def _model(music_tuning: MusicTuning | None = None, debug: bool = False) -> VJModel:
+    return VJModel(music_reactor=MusicReactor(music_tuning or MusicTuning()), debug=debug)
 
 
 def _poll_music(model: VJModel, source: MusicSource | None, now: float) -> None:

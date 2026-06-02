@@ -19,6 +19,7 @@ places, and usable without opening a browser or a heavyweight visual stack.
 - Reacts to live or simulated audio energy, bass, brightness, density, onsets,
   beat estimates, and beat phase.
 - Lets confident audio guide the free clock without taking over manual lock.
+- Auto-triggers effects `1-9` from musical features.
 - Keeps spawned waves alive until they naturally decay.
 - Renders text hits with bundled FIGlet fonts and terminal-native ANSI output.
 
@@ -62,6 +63,12 @@ Synthetic music-reactive demo for development:
 vjctl --music demo
 ```
 
+AutoVJ with on-screen diagnostics:
+
+```bash
+vjctl --debug
+```
+
 Preview one frame in a non-interactive shell:
 
 ```bash
@@ -94,10 +101,10 @@ Inspect the analyzer and model decisions:
 vjctl --meter
 ```
 
-Tune onset triggering:
+Tune AutoVJ triggering:
 
 ```bash
-vjctl --meter --onset-threshold 0.50 --onset-debounce 0.16
+vjctl --onset-threshold 0.50 --effect-threshold 0.70 --debug
 ```
 
 Run with live audio:
@@ -141,13 +148,25 @@ The analyzer reads mono audio blocks and extracts:
 The model uses those values in two ways:
 
 - `MusicReactor` turns music into stage decisions: aggression, density, and
-  whether to spawn an onset wave.
+  whether to spawn an onset wave or fire an automatic effect from `1-9`.
 - `TempoClock` accepts confident audio BPM/phase hints while still respecting
   manual lock.
 
 That means audio can guide the free clock, but four steady manual taps still win.
 Releasing effects or resetting to free roam does not restart the underlying loop
 or kill waves that are already travelling.
+
+Automatic effect selection is intentionally simple:
+
+- massive drive and density can trigger `1` overdrive
+- sharp spectral changes can trigger `7` chroma or `9` collapse
+- heavy bass onsets can trigger `8` quake
+- dense sections can trigger `3` pressure or `5` tunnel
+- bright motion can trigger `6` smear
+- clean hits fall back to `4` impact
+
+`0` stays manual. It is the operator's free-roam reset, not an automatic music
+decision.
 
 ## Meter
 
@@ -160,6 +179,16 @@ vjctl --music demo --meter
 
 Columns include audio features, beat/phase estimates, clock phase, timing
 confidence, trigger decisions, aggression, and density.
+
+For an in-scene readout, run:
+
+```bash
+vjctl --debug
+```
+
+The debug overlay shows analyzer features, beat hints, clock state, model
+aggression/density, wave count, the latest automatic effect, and active hold
+effects.
 
 ## Controls
 

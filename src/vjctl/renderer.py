@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .ansi import RESET, row_to_ansi
 from .buffer import FrameBuffer
+from .debug_overlay import DebugOverlay
 from .effect_renderers import EffectRenderers
 from .model import VJModel
 from .text_layer import TextLayer
@@ -14,6 +15,7 @@ class Renderer:
         self._text = TextLayer()
         self._effects = EffectRenderers(self._text)
         self._waves = WaveRenderer()
+        self._debug = DebugOverlay()
 
     def reset_diff(self) -> None:
         self._previous_rows = []
@@ -28,6 +30,7 @@ class Renderer:
         self._text.social(buffer, model, beat_time)
         self._text.overlays(buffer, model, beat_time)
         self._text.prompt(buffer, model, beat_time)
+        self._debug.render(buffer, model, now)
         return buffer
 
     def flush(self, buffer: FrameBuffer) -> str:

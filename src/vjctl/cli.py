@@ -15,11 +15,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--list-audio-devices", action="store_true")
     parser.add_argument("--list-audio-outputs", action="store_true")
     parser.add_argument("--meter", action="store_true")
+    parser.add_argument("--debug", action="store_true")
     parser.add_argument("--meter-frames", type=int, default=120, help=argparse.SUPPRESS)
     parser.add_argument("--meter-fps", type=int, default=20, help=argparse.SUPPRESS)
     parser.add_argument("--confidence-threshold", type=float, default=0.08)
     parser.add_argument("--onset-threshold", type=float, default=0.58)
     parser.add_argument("--onset-debounce", type=float, default=0.12)
+    parser.add_argument("--effect-threshold", type=float, default=0.74)
+    parser.add_argument("--effect-debounce", type=float, default=0.58)
     parser.add_argument("--preview-frames", type=int, default=0, help=argparse.SUPPRESS)
     parser.add_argument("--width", type=int, default=132, help=argparse.SUPPRESS)
     parser.add_argument("--height", type=int, default=36, help=argparse.SUPPRESS)
@@ -44,10 +47,11 @@ def main(argv: list[str] | None = None) -> int:
                 args.height,
                 music=args.music,
                 music_tuning=tuning,
+                debug=args.debug,
             )
         )
         return 0
-    return run(args.music, _audio_device(args.audio_device), tuning)
+    return run(args.music, _audio_device(args.audio_device), tuning, args.debug)
 
 
 def _audio_device(value: str | None) -> str | int | None:
@@ -63,6 +67,8 @@ def _music_tuning(args: argparse.Namespace) -> MusicTuning:
         confidence_threshold=_amount(args.confidence_threshold),
         onset_threshold=_amount(args.onset_threshold),
         onset_debounce=max(0.0, float(args.onset_debounce)),
+        effect_threshold=_amount(args.effect_threshold),
+        effect_debounce=max(0.0, float(args.effect_debounce)),
     )
 
 
