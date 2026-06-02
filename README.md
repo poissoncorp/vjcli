@@ -1,23 +1,26 @@
 # vjctl
 
-Live terminal VJ instrument for Ghostty.
+Terminal-native VJ instrument for Ghostty.
 
-vjctl turns a terminal into a playable visual surface: tap tempo, shockwaves, text hits,
-blackout gates, glitch pressure, and warehouse-red ANSI chaos.
+`vjctl` turns a terminal into a playable visual surface for DJ/VJ sets: manual
+shockwaves, aggressive hold effects, custom text hits, simulated social events,
+and music-reactive timing from live audio input.
 
-It is built for DJ/VJ sets where you want something fast, dirty, keyboard-driven, and alive without
-opening a browser or a heavyweight visual stack.
+It is built for the booth: fast to launch, keyboard-first, dirty in the right
+places, and usable without opening a browser or a heavyweight visual stack.
 
-## Why It Rules
+## What It Does
 
-- Runs in the terminal.
+- Runs as a real terminal app.
 - Looks best in Ghostty.
-- Responds instantly to keyboard performance.
-- Starts in free roam, then locks to BPM after four steady taps.
-- Lets confident audio beat estimates guide the free clock without taking over manual lock.
-- Keeps spawned waves travelling even after you reset back to free roam.
-- Uses real ANSI/text rendering instead of a web canvas.
-- Ships with simulated social events so the stage can feel alive before real adapters exist.
+- Starts in free roam with low aggression and density.
+- Spawns waves manually from `Tab`.
+- Locks manual BPM after four steady taps.
+- Reacts to live or simulated audio energy, bass, brightness, density, onsets,
+  beat estimates, and beat phase.
+- Lets confident audio guide the free clock without taking over manual lock.
+- Keeps spawned waves alive until they naturally decay.
+- Renders text hits with bundled FIGlet fonts and terminal-native ANSI output.
 
 ## Install
 
@@ -27,39 +30,119 @@ cd vjcli
 python3 -m pip install -e .
 ```
 
-Then run it from anywhere:
+Run from anywhere:
 
 ```bash
 vjctl
 ```
 
-Or run with a synthetic music-reactive feed:
+Run from the repo without installing:
+
+```bash
+script/run
+```
+
+## Quick Start
+
+Manual performance mode:
+
+```bash
+vjctl
+```
+
+Synthetic music-reactive demo:
 
 ```bash
 vjctl --music demo
 ```
 
-For live audio input:
+Preview one frame in a non-interactive shell:
+
+```bash
+vjctl --preview-frames 1 --width 132 --height 36 --music demo
+```
+
+## Live Audio
+
+Install optional audio input support:
 
 ```bash
 python3 -m pip install -e '.[audio]'
+```
+
+List input devices:
+
+```bash
 vjctl --list-audio-devices
+```
+
+Inspect the analyzer and model decisions:
+
+```bash
 vjctl --music audio --meter
+```
+
+Tune onset triggering:
+
+```bash
 vjctl --music audio --meter --onset-threshold 0.50 --onset-debounce 0.16
+```
+
+Run with live audio:
+
+```bash
 vjctl --music audio
 ```
 
-On macOS, route system/DJ audio into an input device with BlackHole or a real audio interface,
-then select it with `--audio-device` if needed.
-Meter prints audio features, beat/phase estimates, and the model trigger/aggression/density
-decision.
-Confident audio beat estimates gently steer the free clock without locking or restarting it.
+On macOS, route system or DJ audio into an input device with BlackHole, Loopback,
+or an audio interface. Select a device with `--audio-device` when needed.
 
-Or run from the repo without installing:
+## Music Sync
+
+`vjctl` is audio-first. It does not require Ableton Link, CDJ metadata, or a
+prebuilt beat grid to feel alive.
+
+The audio path works like this:
+
+```text
+audio input -> analyzer -> MusicFrame -> MusicReactor -> VJModel -> Renderer
+                         -> TempoClock audio hint
+```
+
+The analyzer reads mono audio blocks and extracts:
+
+- energy
+- bass
+- brightness
+- density
+- onset
+- spectral change
+- confidence
+- beat BPM estimate
+- beat phase estimate
+
+The model uses those values in two ways:
+
+- `MusicReactor` turns music into stage decisions: aggression, density, and
+  whether to spawn an onset wave.
+- `TempoClock` accepts confident audio BPM/phase hints while still respecting
+  manual lock.
+
+That means audio can guide the free clock, but four steady manual taps still win.
+Releasing effects or resetting to free roam does not restart the underlying loop
+or kill waves that are already travelling.
+
+## Meter
+
+The meter is the best way to tune a room before performing:
 
 ```bash
-script/run
+vjctl --music demo --meter
+vjctl --music audio --meter
 ```
+
+Columns include audio features, beat/phase estimates, clock phase, timing
+confidence, trigger decisions, aggression, and density.
 
 ## Controls
 
@@ -74,25 +157,26 @@ script/run
 | `Ctrl-C` | Exit |
 | `Esc Esc` | Emergency exit |
 
-Digits trigger effects only while the prompt is empty. After you type any non-digit character,
-digits become normal text.
+Digits trigger effects only while the prompt is empty. After typing any
+non-digit character, digits become normal text.
 
 ## Effects
 
-| Key | Effect |
-| --- | --- |
-| `1` | Overdrive |
-| `2` | Blackout |
-| `3` | Pressure |
-| `4` | Impact |
-| `5` | Tunnel |
-| `6` | Smear |
-| `7` | Chroma |
-| `8` | Quake |
-| `9` | Collapse |
-| `0` | Free roam reset |
+| Key | Effect | Role |
+| --- | --- | --- |
+| `1` | Overdrive | Maximum pressure |
+| `2` | Blackout | Hard gate |
+| `3` | Pressure | Mid-level field stress |
+| `4` | Impact | Visible hit |
+| `5` | Tunnel | Spatial pull |
+| `6` | Smear | Drag and trail |
+| `7` | Chroma | Glitch split |
+| `8` | Quake | Heavy impact |
+| `9` | Collapse | High-chaos failure |
+| `0` | Free roam reset | Clear holds and unlock clock |
 
-`0` clears active effects and returns to free roam, but it does not kill waves that already spawned.
+`0` clears active hold effects and returns to free roam, but it does not kill
+waves that already spawned.
 
 ## Commands
 
@@ -103,8 +187,28 @@ digits become normal text.
 /cooldown
 ```
 
-`aggr` makes waves travel faster. `dens` makes waves thicker. Defaults start low at `0.10 / 0.10`,
-so the room starts controlled and gets ugly only when you push it.
+`aggr` makes waves travel faster. `dens` makes waves thicker. Defaults start at
+`0.10 / 0.10`, so the room begins controlled and gets uglier only when pushed.
+
+## Architecture
+
+The project is a small modular monolith:
+
+- `cli.py` parses user-facing commands.
+- `app.py` owns terminal runtime, input polling, and the render loop.
+- `audio_input.py` reads live audio through `sounddevice`.
+- `analyzer.py` turns samples into music features and beat hints.
+- `music.py` defines the `MusicFrame` data contract.
+- `music_reactor.py` turns music frames into visual decisions.
+- `clock.py` owns free/manual/audio timing.
+- `timing.py` exposes the neutral timing state.
+- `model.py` owns scene state: waves, text, effects, music, and socials.
+- `renderer.py`, `wave_renderer.py`, `effect_renderers.py`, and `text_layer.py`
+  turn model state into ANSI frames.
+
+Renderer code reads state. Sources and adapters produce events or music frames.
+The model applies decisions. This keeps future inputs such as Link, deck metadata,
+OSC, MIDI, or real social adapters from leaking into the renderer.
 
 ## Credits
 
