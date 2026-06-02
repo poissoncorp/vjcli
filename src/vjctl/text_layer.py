@@ -117,12 +117,14 @@ class TextLayer:
     def prompt(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
         if not model.prompt:
             return
+        theme = model.visual_theme
+        if not model.prompt.startswith("/"):
+            self._art.render_text(buffer, model.prompt, theme.ash, model, beat_time, "prompt")
+            return
         text = _clip(model.prompt, max(8, buffer.width - 8))
         x = max(0, (buffer.width - len(text)) // 2)
         y = min(buffer.height - 3, max(2, buffer.height // 2 + 2))
-        theme = model.visual_theme
-        color = theme.primary if model.prompt.startswith("/") else theme.ash
-        self._plain.render(buffer, text, x, y, color)
+        self._plain.render(buffer, text, x, y, theme.primary)
 
     def hud(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
         if buffer.width < 82 or buffer.height < 20:
