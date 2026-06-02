@@ -19,7 +19,7 @@ from .renderer import Renderer
 from .sources import SimulatedMusicSource, SimulatedSocialSource
 
 METER_HEADER = (
-    "frame scene sage auto energy bass high dens onset change conf "
+    "frame scene sage auto lsd lconf energy bass high dens onset change conf "
     "bpm bphase bconf clock phase tconf trig pressure score thit ahit baccent "
     "aggr mdens\n"
 )
@@ -49,6 +49,7 @@ def run(
     audio_device: str | int | None = None,
     music_tuning: MusicTuning | None = None,
     debug: bool = False,
+    lsd: bool = False,
 ) -> int:
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         sys.stderr.write(
@@ -61,7 +62,7 @@ def run(
         sys.stderr.write(f"{error}\n")
         return 2
 
-    model = _model(music_tuning, debug)
+    model = _model(music_tuning, debug, lsd)
     renderer = Renderer()
     decoder = InputDecoder()
     social_source = SimulatedSocialSource()
@@ -112,8 +113,9 @@ def render_preview(
     music: str = "demo",
     music_tuning: MusicTuning | None = None,
     debug: bool = False,
+    lsd: bool = False,
 ) -> str:
-    model = _model(music_tuning, debug)
+    model = _model(music_tuning, debug, lsd)
     renderer = Renderer()
     social_source = SimulatedSocialSource()
     music_source = _music_source(music if music == "demo" else "none")
@@ -143,6 +145,7 @@ def run_meter(
     frames: int = 120,
     fps: int = 20,
     music_tuning: MusicTuning | None = None,
+    lsd: bool = False,
 ) -> int:
     if music == "none":
         sys.stderr.write("Choose --music demo or --music audio for meter.\n")
@@ -154,7 +157,7 @@ def run_meter(
         return 2
     if source is None:
         return 2
-    model = _model(music_tuning)
+    model = _model(music_tuning, lsd=lsd)
     interval = 1.0 / max(1, fps)
     last_frame = time.monotonic()
     next_at = time.monotonic()
@@ -194,8 +197,16 @@ def _close_source(source: MusicSource | None) -> None:
         close()
 
 
-def _model(music_tuning: MusicTuning | None = None, debug: bool = False) -> VJModel:
-    return VJModel(music_reactor=MusicReactor(music_tuning or MusicTuning()), debug=debug)
+def _model(
+    music_tuning: MusicTuning | None = None,
+    debug: bool = False,
+    lsd: bool = False,
+) -> VJModel:
+    return VJModel(
+        music_reactor=MusicReactor(music_tuning or MusicTuning()),
+        debug=debug,
+        lsd=lsd,
+    )
 
 
 def _poll_music(model: VJModel, source: MusicSource | None, now: float) -> None:
@@ -236,9 +247,19 @@ def _meter_line(index: int, frame: MusicFrame, model: VJModel, hit: bool) -> str
         model.auto_scene,
         f"{model.auto_scene_age:.3f}",
         model.last_auto_effect,
+        _lsd_name(model),
+        f"{model.visual_theme.confidence:.3f}" if model.lsd else "0.000",
     ]
     fields.extend(f"{value:.3f}" for value in values)
     return " ".join(fields) + "\n"
+
+
+def _lsd_name(model: VJModel) -> str:
+    if not model.lsd:
+        return "off"
+    if model.visual_theme.confidence <= 0.0:
+        return "wait"
+    return model.visual_theme.profile
 
 
 def _read_events(decoder: InputDecoder) -> list[InputEvent]:

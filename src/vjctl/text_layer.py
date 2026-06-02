@@ -3,7 +3,7 @@ from __future__ import annotations
 from .buffer import FrameBuffer
 from .model import VJModel
 from .noise import grain
-from .palette import ASH, BLACK, DEEP_RED, RED, Color
+from .palette import BLACK, DEEP_RED, RED, Color
 from .text_art import choose_art
 
 PIXEL = "█"
@@ -50,6 +50,7 @@ class ArtText:
         mode: str = "hero",
         knockout: bool = True,
     ) -> None:
+        theme = model.visual_theme
         chroma = _effect_amount(model, "chroma")
         overdrive = _effect_amount(model, "overdrive")
         collapse = _effect_amount(model, "collapse")
@@ -64,10 +65,19 @@ class ArtText:
         if knockout:
             _knockout(buffer, lines, x, y)
         left_x = x - 1 - round(split * 3)
-        _pixel_layer(buffer, lines, left_x, y, DEEP_RED, salt + 3, split * 0.42, True)
-        _pixel_layer(buffer, lines, x + 1 + round(split * 4), y, RED, salt + 7, split * 0.55, True)
-        _pixel_layer(buffer, lines, x + 1, y - 1, ASH, salt + 11, split * 0.28, True)
-        _pixel_layer(buffer, lines, x, y, color, salt, damage, False)
+        _pixel_layer(buffer, lines, left_x, y, theme.deep, salt + 3, split * 0.42, True)
+        _pixel_layer(
+            buffer,
+            lines,
+            x + 1 + round(split * 4),
+            y,
+            theme.primary,
+            salt + 7,
+            split * 0.55,
+            True,
+        )
+        _pixel_layer(buffer, lines, x + 1, y - 1, theme.ghost, salt + 11, split * 0.28, True)
+        _pixel_layer(buffer, lines, x, y, color, salt, damage, False, theme.primary, theme.deep)
 
 
 class TextLayer:
@@ -86,14 +96,16 @@ class TextLayer:
             bottom = max(top, buffer.height - 2)
             x = max(0, min(buffer.width - width, x))
             y = max(top, min(bottom, y))
-            color = RED if event.kind == "follow" else ASH
+            theme = model.visual_theme
+            color = theme.primary if event.kind == "follow" else theme.ash
             self._plain.render(buffer, text, x, y, color, True)
 
     def overlays(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
         if not model.overlays:
             return
         overlay = model.overlays[-1]
-        color = ASH if overlay.kind == "system" else RED
+        theme = model.visual_theme
+        color = theme.ash if overlay.kind == "system" else theme.primary
         if overlay.kind == "system":
             text = _clip(overlay.text, max(8, buffer.width - 8))
             x = max(0, (buffer.width - len(text)) // 2)
@@ -108,13 +120,15 @@ class TextLayer:
         text = _clip(model.prompt, max(8, buffer.width - 8))
         x = max(0, (buffer.width - len(text)) // 2)
         y = min(buffer.height - 3, max(2, buffer.height // 2 + 2))
-        color = RED if model.prompt.startswith("/") else ASH
+        theme = model.visual_theme
+        color = theme.primary if model.prompt.startswith("/") else theme.ash
         self._plain.render(buffer, text, x, y, color)
 
     def hud(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
         if buffer.width < 82 or buffer.height < 20:
             return
         timing = model.timing
+        theme = model.visual_theme
         mode = "LOCK" if timing.locked else timing.source.upper()
         bpm = round(timing.bpm)
         self._plain.render(
@@ -122,7 +136,7 @@ class TextLayer:
             f"{mode} {bpm}",
             buffer.width - len(f"{mode} {bpm}") - 2,
             0,
-            RED,
+            theme.primary,
             True,
         )
         if model.prompt or model.overlays or model.socials or buffer.height < 28:
@@ -135,7 +149,7 @@ class TextLayer:
             meters,
             buffer.width - len(meters) - 2,
             3,
-            RED,
+            theme.primary,
             True,
         )
 
@@ -173,6 +187,8 @@ def _pixel_layer(
     salt: int,
     amount: float,
     ghost: bool,
+    edge_primary: Color = RED,
+    edge_deep: Color = DEEP_RED,
 ) -> None:
     if ghost and amount <= 0.02:
         return
@@ -195,7 +211,7 @@ def _pixel_layer(
             if cell_grain % 100 < 4 + amount * 22:
                 slip = cell_grain % 7 - 3
                 if slip != 0:
-                    edge = RED if slip > 0 else DEEP_RED
+                    edge = edge_primary if slip > 0 else edge_deep
                     buffer.write_cell(xx + slip, yy, _art_char(char), fg=edge, dim=True)
 
 

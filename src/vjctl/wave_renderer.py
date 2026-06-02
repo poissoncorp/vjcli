@@ -3,17 +3,18 @@ from __future__ import annotations
 import math
 
 from .buffer import FrameBuffer
-from .model import Wave
+from .model import VJModel, Wave
 from .noise import grain
-from .palette import DEEP_RED, RED
+from .palette import DEEP_RED, RED, Color
 
 
 class WaveRenderer:
-    def render(self, buffer: FrameBuffer, waves: list[Wave], now: float) -> None:
+    def render(self, buffer: FrameBuffer, model: VJModel, now: float) -> None:
         cx = buffer.width // 2
         cy = buffer.height // 2
         max_radius = math.hypot(buffer.width / 2, buffer.height * 1.25) * 1.18
-        for wave in waves:
+        theme = model.visual_theme
+        for wave in model.waves:
             age = now - wave.born_at
             if age < 0.0:
                 continue
@@ -32,7 +33,18 @@ class WaveRenderer:
                 if band_radius <= 0:
                     continue
                 band_energy = energy * (1.0 - band / (bands + 2.0))
-                draw_shockwave(buffer, cx, cy, band_radius, thickness, band_energy, wave.density, band)
+                draw_shockwave(
+                    buffer,
+                    cx,
+                    cy,
+                    band_radius,
+                    thickness,
+                    band_energy * theme.kick_gain,
+                    wave.density * theme.line_gain,
+                    band,
+                    theme.primary,
+                    theme.deep,
+                )
 
 
 def draw_shockwave(
@@ -44,6 +56,8 @@ def draw_shockwave(
     energy: float,
     density: float,
     band: int,
+    primary: Color = RED,
+    deep: Color = DEEP_RED,
 ) -> None:
     vertical_scale = 2.5
     y0 = max(2, round(cy - radius / vertical_scale) - thickness)
@@ -55,7 +69,7 @@ def draw_shockwave(
             continue
         dx = round(math.sqrt(remaining))
         for sign in (-1, 1):
-            _wave_cluster(buffer, cx, y, dx, sign, thickness, energy, density, band)
+            _wave_cluster(buffer, cx, y, dx, sign, thickness, energy, density, band, primary, deep)
 
 
 def _wave_cluster(
@@ -68,6 +82,8 @@ def _wave_cluster(
     energy: float,
     density: float,
     band: int,
+    primary: Color,
+    deep: Color,
 ) -> None:
     for spread in range(-thickness, thickness + 1):
         x = cx + sign * (dx + spread)
@@ -81,7 +97,7 @@ def _wave_cluster(
             x,
             y,
             _wave_char(energy, edge, cell_grain),
-            fg=RED if energy > 0.42 else DEEP_RED,
+            fg=primary if energy > 0.42 else deep,
             bold=energy > 0.56 and edge < 0.55,
         )
 
@@ -93,7 +109,7 @@ def _wave_cluster(
         x = cx + sign * (dx + cell_grain % max(2, debris * 2) - debris)
         yy = y + (cell_grain // 13) % 5 - 2
         if 0 <= x < buffer.width and 2 <= yy < buffer.height - 2:
-            buffer.write_cell(x, yy, _debris_char(energy, cell_grain), fg=DEEP_RED, dim=energy < 0.66)
+            buffer.write_cell(x, yy, _debris_char(energy, cell_grain), fg=deep, dim=energy < 0.66)
 
 
 def _wave_char(energy: float, edge: float, cell_grain: int) -> str:

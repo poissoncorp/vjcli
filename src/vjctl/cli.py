@@ -16,6 +16,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--list-audio-outputs", action="store_true")
     parser.add_argument("--meter", action="store_true")
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--lsd", action="store_true")
     parser.add_argument("--meter-frames", type=int, default=120, help=argparse.SUPPRESS)
     parser.add_argument("--meter-fps", type=int, default=20, help=argparse.SUPPRESS)
     parser.add_argument("--confidence-threshold", type=float, default=0.08)
@@ -38,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
         return _list_audio_outputs()
     if args.meter:
         device = _audio_device(args.audio_device)
-        return run_meter(args.music, device, args.meter_frames, args.meter_fps, tuning)
+        return run_meter(args.music, device, args.meter_frames, args.meter_fps, tuning, args.lsd)
     if args.preview_frames > 0:
         sys.stdout.write(
             render_preview(
@@ -48,10 +49,11 @@ def main(argv: list[str] | None = None) -> int:
                 music=args.music,
                 music_tuning=tuning,
                 debug=args.debug,
+                lsd=args.lsd,
             )
         )
         return 0
-    return run(args.music, _audio_device(args.audio_device), tuning, args.debug)
+    return run(args.music, _audio_device(args.audio_device), tuning, args.debug, args.lsd)
 
 
 def _audio_device(value: str | None) -> str | int | None:

@@ -4,7 +4,7 @@ Terminal-native VJ instrument for Ghostty.
 
 `vjctl` turns a terminal into a playable visual surface for DJ/VJ sets: manual
 shockwaves, aggressive hold effects, custom text hits, simulated social events,
-and music-reactive timing from live audio input.
+and automatic music-reactive visuals from live audio input.
 
 It is built for the booth: fast to launch, keyboard-first, dirty in the right
 places, and usable without opening a browser or a heavyweight visual stack.
@@ -13,13 +13,15 @@ places, and usable without opening a browser or a heavyweight visual stack.
 
 - Runs as a real terminal app.
 - Looks best in Ghostty.
-- Starts in free roam with low aggression and density.
+- Starts in fully automatic live-audio mode.
+- Falls back to free roam with low aggression and density when audio is absent.
 - Spawns waves manually from `Tab`.
 - Locks manual BPM after four steady taps.
 - Reacts to live or simulated audio energy, bass, brightness, density, onsets,
   beat estimates, and beat phase.
 - Lets confident audio guide the free clock without taking over manual lock.
 - Auto-triggers effects `1-9` from musical features.
+- Supports opt-in `--lsd` color profiling from the character of the track.
 - Keeps spawned waves alive until they naturally decay.
 - Renders text hits with bundled FIGlet fonts and terminal-native ANSI output.
 
@@ -51,6 +53,12 @@ Live audio performance mode:
 vjctl
 ```
 
+Live audio with mood-reactive color profiling:
+
+```bash
+vjctl --lsd
+```
+
 Manual-only mode:
 
 ```bash
@@ -67,6 +75,12 @@ AutoVJ with on-screen diagnostics:
 
 ```bash
 vjctl --debug
+```
+
+AutoVJ plus LSD diagnostics:
+
+```bash
+vjctl --debug --lsd
 ```
 
 Preview one frame in a non-interactive shell:
@@ -131,6 +145,7 @@ The audio path works like this:
 ```text
 audio input -> analyzer -> MusicFrame -> MusicReactor -> VJModel -> Renderer
                          -> TempoClock audio hint
+                         -> LsdDirector when --lsd is enabled
 ```
 
 The analyzer reads mono audio blocks and extracts:
@@ -151,6 +166,8 @@ The model uses those values in two ways:
   whether to spawn an onset wave or fire an automatic effect from `1-9`.
 - `TempoClock` accepts confident audio BPM/phase hints while still respecting
   manual lock.
+- `LsdDirector` classifies the musical climate when `--lsd` is enabled and
+  chooses the color, speed, line weight, kick impact, and haze profile.
 
 That means audio can guide the free clock, but four steady manual taps still win.
 Releasing effects or resetting to free roam does not restart the underlying loop
@@ -177,6 +194,21 @@ flickering between modes every analyzer frame.
 `0` stays manual. It is the operator's free-roam reset, not an automatic music
 decision.
 
+## LSD Mode
+
+`--lsd` keeps the same control model and effect timing, but lets the track choose
+the visual climate:
+
+- `velvet` slows down and softens calm, airy material
+- `house` keeps kick response clean and warm
+- `acid` pushes bright, unstable, high-frequency tracks
+- `spectral` opens up cold, sparse, melodic space
+- `industrial` adds grit and heavier line pressure
+- `hard` makes fast, dense, high-drive sections hit harder
+
+The mode is opt-in. Without `--lsd`, `vjctl` stays in the original red/black
+warehouse palette.
+
 ## Meter
 
 The meter is the best way to tune a room before performing:
@@ -189,7 +221,7 @@ vjctl --music demo --meter
 Columns include scene, scene age, latest automatic effect, audio features,
 beat/phase estimates, clock phase, timing confidence, trigger decisions,
 pressure, trigger score, transition hit strength, aftershock strength,
-beat accent, aggression, and density.
+beat accent, aggression, density, LSD profile, and LSD confidence.
 
 For an in-scene readout, run:
 
@@ -200,7 +232,7 @@ vjctl --debug
 The debug overlay shows analyzer features, beat hints, clock state, scene, scene
 age, pressure, trigger score, model aggression/density, wave count, the latest
 beat accent, transition hit, aftershock strength, automatic effect, and active
-hold effects.
+hold effects. With `--lsd`, it also shows the selected profile and confidence.
 
 ## Controls
 
@@ -258,6 +290,7 @@ The project is a small modular monolith:
 - `analyzer.py` turns samples into music features and beat hints.
 - `music.py` defines the `MusicFrame` data contract.
 - `music_reactor.py` turns music frames into visual decisions.
+- `lsd.py` turns music frames into opt-in color and motion profiles.
 - `clock.py` owns free/manual/audio timing.
 - `timing.py` exposes the neutral timing state.
 - `model.py` owns scene state: waves, text, effects, music, and socials.

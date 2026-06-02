@@ -47,6 +47,7 @@ def _debug_lines(model: VJModel, now: float) -> list[str]:
             f"P{model.auto_pressure:.2f} S{model.auto_score:.2f} "
             f"H{model.auto_transition_strength:.2f} K{model.auto_hit:.2f}"
         ),
+        f"LSD {_lsd(model)}",
         f"AUTO {_last_auto(model, now)}",
         f"FX {_active_effects(model)}",
     ]
@@ -59,9 +60,20 @@ def _style(line: str, index: int) -> tuple[Color, bool, bool]:
         return RED, False, False
     if line.startswith("AUTO ") and not line.endswith(" -"):
         return RED, False, False
+    if line.startswith("LSD ") and " C" in line:
+        return RED, False, False
     if line.startswith("FX ") and not line.endswith(" -"):
         return RED, True, False
     return ASH, False, True
+
+
+def _lsd(model: VJModel) -> str:
+    if not model.lsd:
+        return "OFF"
+    theme = model.visual_theme
+    if theme.confidence <= 0.0:
+        return "WAIT"
+    return f"{theme.profile.upper()} C{theme.confidence:.2f}"
 
 
 def _last_auto(model: VJModel, now: float) -> str:

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from .clock import TempoClock
 from .effects import EFFECTS, EFFECT_BY_KEY, EffectSpec
 from .events import SocialIncoming
+from .lsd import DEFAULT_THEME, LsdDirector, LsdTheme
 from .music import MusicFrame
 from .music_reactor import DEFAULT_AGGRESSION, DEFAULT_DENSITY, MusicReactor
 from .timing import TimingState
@@ -71,12 +72,15 @@ class VJModel:
     aggression: float = DEFAULT_AGGRESSION
     density: float = DEFAULT_DENSITY
     debug: bool = False
+    lsd: bool = False
     prompt: str = ""
     overlays: list[Overlay] = field(default_factory=list)
     socials: list[SocialEvent] = field(default_factory=list)
     waves: list[Wave] = field(default_factory=list)
     music: MusicFrame = field(default_factory=MusicFrame)
     music_reactor: MusicReactor = field(default_factory=MusicReactor)
+    lsd_director: LsdDirector = field(default_factory=LsdDirector)
+    lsd_theme: LsdTheme = DEFAULT_THEME
     effects: dict[str, HoldEffect] = field(
         default_factory=lambda: {effect.name: HoldEffect(effect.name) for effect in EFFECTS}
     )
@@ -128,6 +132,12 @@ class VJModel:
         audio_weight = max(self.music.confidence, self.music.beat_confidence)
         audio = self.music.onset * audio_weight * 0.62
         return max(0.0, min(1.0, max(clock, audio)))
+
+    @property
+    def visual_theme(self) -> LsdTheme:
+        if not self.lsd:
+            return DEFAULT_THEME
+        return self.lsd_theme
 
     @property
     def beat_time(self) -> float:
@@ -187,6 +197,8 @@ class VJModel:
     def apply_music(self, frame: MusicFrame, now: float) -> None:
         self.music = frame
         self.clock.suggest_audio(frame.beat_bpm, frame.beat_phase, frame.beat_confidence)
+        if self.lsd:
+            self.lsd_theme = self.lsd_director.update(frame, self.timing)
         reaction = self.music_reactor.react(frame, now, self.aggression, self.density)
         self.aggression = reaction.aggression
         self.density = reaction.density

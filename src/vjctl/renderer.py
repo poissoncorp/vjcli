@@ -27,7 +27,7 @@ class Renderer:
         beat_time = model.beat_time
         self._effects.background(buffer, model, beat_time)
         self._scene.render(buffer, model, beat_time)
-        self._waves.render(buffer, model.waves, now)
+        self._waves.render(buffer, model, now)
         self._effects.effects(buffer, model, beat_time)
         self._text.hud(buffer, model, beat_time)
         self._text.social(buffer, model, beat_time)
