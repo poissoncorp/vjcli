@@ -20,7 +20,7 @@ from .sources import SimulatedMusicSource, SimulatedSocialSource
 
 METER_HEADER = (
     "frame scene sage auto energy bass high dens onset change conf "
-    "bpm bphase bconf clock phase tconf trig pressure score thit aggr mdens\n"
+    "bpm bphase bconf clock phase tconf trig pressure score thit ahit aggr mdens\n"
 )
 
 
@@ -155,11 +155,15 @@ def run_meter(
         return 2
     model = _model(music_tuning)
     interval = 1.0 / max(1, fps)
+    last_frame = time.monotonic()
     next_at = time.monotonic()
     sys.stdout.write(METER_HEADER)
     try:
         for index in range(max(0, frames)):
             now = time.monotonic()
+            dt = min(0.1, now - last_frame)
+            last_frame = now
+            model.update(dt, now)
             frame = source.poll(now) or MusicFrame()
             wave_count = len(model.waves)
             model.apply_music(frame, now)
@@ -221,6 +225,7 @@ def _meter_line(index: int, frame: MusicFrame, model: VJModel, hit: bool) -> str
         model.auto_pressure,
         model.auto_score,
         model.auto_transition_strength,
+        model.auto_hit,
         model.effective_aggression,
         model.effective_density,
     )

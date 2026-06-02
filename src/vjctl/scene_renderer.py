@@ -11,24 +11,20 @@ class SceneRenderer:
         if model.cooldown > 0.92:
             return
         scene = model.auto_scene
-        pressure = max(model.auto_pressure, model.music.energy * 0.08)
+        pressure = max(model.auto_pressure, model.music.energy * 0.08, model.auto_hit * 0.54)
         if scene in ("idle", "listen"):
             self._listen(buffer, model, beat_time, pressure)
-            return
-        if scene == "drive":
+        elif scene == "drive":
             self._drive(buffer, model, beat_time, pressure)
-            return
-        if scene == "fault":
+        elif scene == "fault":
             self._fault(buffer, model, beat_time, pressure)
-            return
-        if scene == "weight":
+        elif scene == "weight":
             self._weight(buffer, model, beat_time, pressure)
-            return
-        if scene == "rupture":
+        elif scene == "rupture":
             self._rupture(buffer, model, beat_time, pressure)
-            return
-        if scene == "chaos":
+        elif scene == "chaos":
             self._chaos(buffer, model, beat_time, pressure)
+        self._aftershock(buffer, model, beat_time)
 
     def _listen(
         self,
@@ -138,6 +134,34 @@ class SceneRenderer:
         self._fault(buffer, model, beat_time, amount)
         if amount > 0.62:
             self._rupture(buffer, model, beat_time, amount * 0.86)
+
+    def _aftershock(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
+        hit = model.auto_hit
+        if hit < 0.06:
+            return
+        salt = round(beat_time * (7 + hit * 9))
+        center_x = buffer.width // 2
+        center_y = buffer.height // 2
+        bands = 2 + round(hit * 4)
+        span = round(buffer.width * (0.16 + hit * 0.28))
+        for band in range(bands):
+            y = center_y + (band - bands // 2) * max(2, round(buffer.height * 0.07))
+            jitter = grain(band, salt, 53) % 7 - 3
+            for x in range(center_x - span, center_x + span, 2):
+                if grain(x, y, salt + band) % 100 > 52 + hit * 30:
+                    continue
+                char = "=" if hit > 0.52 and x % 3 == 0 else "-"
+                color = RED if grain(x, band, salt) % 100 < 70 else ASH
+                buffer.write_cell(x + jitter, y, char, fg=color, bold=hit > 0.7, dim=hit < 0.42)
+
+        step = max(2, round(7 - hit * 4))
+        inset = max(1, round(buffer.width * (0.025 + hit * 0.035)))
+        for y in range(3, buffer.height - 3, step):
+            if grain(y, salt, 61) % 100 > 34 + hit * 42:
+                continue
+            char = "|" if hit > 0.58 else ":"
+            buffer.write_cell(inset, y, char, fg=RED, dim=hit < 0.5)
+            buffer.write_cell(buffer.width - inset - 1, y, char, fg=RED, dim=hit < 0.5)
 
     def _rail(
         self,

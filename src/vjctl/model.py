@@ -87,6 +87,7 @@ class VJModel:
     auto_pressure: float = 0.0
     auto_score: float = 0.0
     auto_transition_strength: float = 0.0
+    auto_hit: float = 0.0
     last_auto_effect: str = "-"
     last_auto_effect_at: float = -999.0
     rng: random.Random = field(default_factory=lambda: random.Random(901507))
@@ -106,6 +107,8 @@ class VJModel:
             self.cooldown = min(1.0, self.cooldown + dt / 9.0)
             if self.cooldown >= 1.0:
                 self.clear_effects()
+        self.auto_transition_strength = 0.0
+        self.auto_hit = max(0.0, self.auto_hit - dt * 1.35)
         self._expire(now)
         return beat
 
@@ -186,6 +189,7 @@ class VJModel:
         if reaction.wave_strength is not None:
             self._spawn_wave(now, reaction.wave_strength)
         if reaction.transition_strength is not None:
+            self.auto_hit = max(self.auto_hit, reaction.transition_strength)
             self._spawn_wave(now, reaction.transition_strength)
         if reaction.effect_key is not None:
             self._trigger_key(reaction.effect_key, now, True)
@@ -249,6 +253,8 @@ class VJModel:
     def free_roam(self) -> None:
         self.clear_effects()
         self.cooldown = 0.0
+        self.auto_hit = 0.0
+        self.auto_transition_strength = 0.0
         self.clock.free_roam()
         self.status = "FREE ROAM"
 

@@ -186,7 +186,8 @@ vjctl --music demo --meter
 
 Columns include scene, scene age, latest automatic effect, audio features,
 beat/phase estimates, clock phase, timing confidence, trigger decisions,
-pressure, trigger score, transition hit strength, aggression, and density.
+pressure, trigger score, transition hit strength, aftershock strength,
+aggression, and density.
 
 For an in-scene readout, run:
 
@@ -196,7 +197,7 @@ vjctl --debug
 
 The debug overlay shows analyzer features, beat hints, clock state, scene, scene
 age, pressure, trigger score, model aggression/density, wave count, the latest
-transition hit, automatic effect, and active hold effects.
+transition hit, aftershock strength, automatic effect, and active hold effects.
 
 ## Controls
 
