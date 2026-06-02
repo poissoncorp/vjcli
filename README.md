@@ -27,10 +27,10 @@ places, and usable without opening a browser or a heavyweight visual stack.
 ```bash
 git clone https://github.com/poissoncorp/vjcli.git
 cd vjcli
-python3 -m pip install -e .
+python3 -m pip install -e '.[audio]'
 ```
 
-Run from anywhere:
+Run with live audio as the default mode:
 
 ```bash
 vjctl
@@ -44,13 +44,19 @@ script/run
 
 ## Quick Start
 
-Manual performance mode:
+Live audio performance mode:
 
 ```bash
 vjctl
 ```
 
-Synthetic music-reactive demo:
+Manual-only mode:
+
+```bash
+vjctl --music none
+```
+
+Synthetic music-reactive demo for development:
 
 ```bash
 vjctl --music demo
@@ -62,9 +68,9 @@ Preview one frame in a non-interactive shell:
 vjctl --preview-frames 1 --width 132 --height 36 --music demo
 ```
 
-## Live Audio
+## Audio Routing
 
-Install optional audio input support:
+Install or refresh audio input support:
 
 ```bash
 python3 -m pip install -e '.[audio]'
@@ -76,26 +82,37 @@ List input devices:
 vjctl --list-audio-devices
 ```
 
+List output devices:
+
+```bash
+vjctl --list-audio-outputs
+```
+
 Inspect the analyzer and model decisions:
 
 ```bash
-vjctl --music audio --meter
+vjctl --meter
 ```
 
 Tune onset triggering:
 
 ```bash
-vjctl --music audio --meter --onset-threshold 0.50 --onset-debounce 0.16
+vjctl --meter --onset-threshold 0.50 --onset-debounce 0.16
 ```
 
 Run with live audio:
 
 ```bash
-vjctl --music audio
+vjctl
 ```
 
-On macOS, route system or DJ audio into an input device with BlackHole, Loopback,
-or an audio interface. Select a device with `--audio-device` when needed.
+On macOS, `sounddevice` can open input devices directly. It cannot magically
+read speaker output as an input stream. To react to system/DJ output, route that
+output into an input with BlackHole, Loopback, or an audio interface, then select
+the input with `--audio-device` when needed.
+
+`--list-audio-outputs` is diagnostic: it shows where audio can play, but visual
+analysis still needs a capture input or loopback device.
 
 ## Music Sync
 
@@ -137,8 +154,8 @@ or kill waves that are already travelling.
 The meter is the best way to tune a room before performing:
 
 ```bash
+vjctl --meter
 vjctl --music demo --meter
-vjctl --music audio --meter
 ```
 
 Columns include audio features, beat/phase estimates, clock phase, timing

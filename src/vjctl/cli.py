@@ -3,16 +3,17 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .audio_input import audio_device_lines
+from .audio_input import audio_device_lines, audio_output_lines
 from .app import render_preview, run, run_meter
 from .music_reactor import MusicTuning
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="vjctl", description="Terminal VJ control realm.")
-    parser.add_argument("--music", choices=("none", "demo", "audio"), default="none")
+    parser.add_argument("--music", choices=("none", "demo", "audio"), default="audio")
     parser.add_argument("--audio-device", default=None)
     parser.add_argument("--list-audio-devices", action="store_true")
+    parser.add_argument("--list-audio-outputs", action="store_true")
     parser.add_argument("--meter", action="store_true")
     parser.add_argument("--meter-frames", type=int, default=120, help=argparse.SUPPRESS)
     parser.add_argument("--meter-fps", type=int, default=20, help=argparse.SUPPRESS)
@@ -30,6 +31,8 @@ def main(argv: list[str] | None = None) -> int:
     tuning = _music_tuning(args)
     if args.list_audio_devices:
         return _list_audio_devices()
+    if args.list_audio_outputs:
+        return _list_audio_outputs()
     if args.meter:
         device = _audio_device(args.audio_device)
         return run_meter(args.music, device, args.meter_frames, args.meter_fps, tuning)
@@ -75,6 +78,19 @@ def _list_audio_devices() -> int:
         return 2
     if not lines:
         sys.stdout.write("No audio input devices found.\n")
+        return 0
+    sys.stdout.write("\n".join(lines) + "\n")
+    return 0
+
+
+def _list_audio_outputs() -> int:
+    try:
+        lines = audio_output_lines()
+    except RuntimeError as error:
+        sys.stderr.write(f"{error}\n")
+        return 2
+    if not lines:
+        sys.stdout.write("No audio output devices found.\n")
         return 0
     sys.stdout.write("\n".join(lines) + "\n")
     return 0

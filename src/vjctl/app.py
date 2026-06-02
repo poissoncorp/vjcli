@@ -44,7 +44,7 @@ class TerminalSession:
 
 
 def run(
-    music: str = "none",
+    music: str = "audio",
     audio_device: str | int | None = None,
     music_tuning: MusicTuning | None = None,
 ) -> int:
@@ -107,7 +107,7 @@ def render_preview(
     width: int,
     height: int,
     fps: int = 12,
-    music: str = "none",
+    music: str = "demo",
     music_tuning: MusicTuning | None = None,
 ) -> str:
     model = _model(music_tuning)

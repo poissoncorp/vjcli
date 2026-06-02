@@ -16,10 +16,7 @@ class AudioInputSource:
         sample_rate: int = 16_000,
         block_size: int = 512,
     ) -> None:
-        try:
-            import sounddevice
-        except ImportError as exc:
-            raise RuntimeError(INSTALL_AUDIO_MESSAGE) from exc
+        sounddevice = _audio_stack()
         self.sample_rate = sample_rate
         self.samples: deque[float] = deque(maxlen=sample_rate)
         self.lock = Lock()
@@ -69,19 +66,35 @@ class AudioInputSource:
 
 
 def audio_device_lines() -> list[str]:
+    return _audio_device_lines("input")
+
+
+def audio_output_lines() -> list[str]:
+    return _audio_device_lines("output")
+
+
+def _audio_stack():
     try:
+        import numpy
         import sounddevice
     except ImportError as exc:
         raise RuntimeError(INSTALL_AUDIO_MESSAGE) from exc
+    return sounddevice
+
+
+def _audio_device_lines(kind: str) -> list[str]:
+    sounddevice = _audio_stack()
     devices = sounddevice.query_devices()
     lines: list[str] = []
+    channel_key = "max_input_channels" if kind == "input" else "max_output_channels"
+    suffix = "in" if kind == "input" else "out"
     for index, device in enumerate(devices):
-        inputs = int(device.get("max_input_channels", 0))
-        if inputs <= 0:
+        channels = int(device.get(channel_key, 0))
+        if channels <= 0:
             continue
         name = str(device.get("name", "unknown"))
         rate = round(float(device.get("default_samplerate", 0.0)))
-        lines.append(f"{index}: {name} ({inputs} in, {rate} Hz)")
+        lines.append(f"{index}: {name} ({channels} {suffix}, {rate} Hz)")
     return lines
 
 
