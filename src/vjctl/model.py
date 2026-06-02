@@ -92,6 +92,8 @@ class VJModel:
     auto_score: float = 0.0
     auto_transition_strength: float = 0.0
     auto_hit: float = 0.0
+    lsd_shift: float = 0.0
+    last_lsd_shift_at: float = -999.0
     last_auto_effect: str = "-"
     last_auto_effect_at: float = -999.0
     rng: random.Random = field(default_factory=lambda: random.Random(901507))
@@ -113,6 +115,7 @@ class VJModel:
                 self.clear_effects()
         self.auto_transition_strength = 0.0
         self.auto_hit = max(0.0, self.auto_hit - dt * 1.35)
+        self.lsd_shift = max(0.0, self.lsd_shift - dt * 1.2)
         self._expire(now)
         return beat
 
@@ -203,6 +206,7 @@ class VJModel:
     def apply_music(self, frame: MusicFrame, now: float) -> None:
         self.music = frame
         self.clock.suggest_audio(frame.beat_bpm, frame.beat_phase, frame.beat_confidence)
+        previous_theme = self.lsd_theme
         if self.lsd:
             self.lsd_theme = self.lsd_director.update(frame, self.timing)
         reaction = self.music_reactor.react(
@@ -224,11 +228,38 @@ class VJModel:
         if reaction.transition_strength is not None:
             self.auto_hit = max(self.auto_hit, reaction.transition_strength)
             self._spawn_wave(now, reaction.transition_strength)
+        lsd_shift = self._lsd_shift_strength(previous_theme, now)
+        if lsd_shift > 0.0:
+            self.lsd_shift = lsd_shift
+            self.auto_hit = max(self.auto_hit, lsd_shift)
+            self.auto_transition_strength = max(self.auto_transition_strength, lsd_shift)
+            self._spawn_wave(now, lsd_shift)
         if reaction.effect_key is not None:
             self._trigger_key(reaction.effect_key, now, True)
             return
+        if lsd_shift > 0.0:
+            self.status = f"LSD {self.lsd_theme.profile.upper()}"
+            return
         if reaction.status is not None:
             self.status = reaction.status
+
+    def _lsd_shift_strength(self, previous: LsdTheme, now: float) -> float:
+        if not self.lsd:
+            return 0.0
+        current = self.lsd_theme
+        if previous.profile == current.profile:
+            return 0.0
+        if previous.profile == DEFAULT_THEME.profile:
+            return 0.0
+        if previous.confidence < 0.18 or current.confidence < 0.18:
+            return 0.0
+        if current.margin < 0.07:
+            return 0.0
+        if now - self.last_lsd_shift_at < 1.4:
+            return 0.0
+        self.last_lsd_shift_at = now
+        strength = 0.28 + current.confidence * 0.44 + current.margin * 1.2
+        return max(0.32, min(0.86, strength))
 
     def hold(self, key_id: str, now: float = 0.0) -> None:
         self._trigger_key(key_id, now, False)

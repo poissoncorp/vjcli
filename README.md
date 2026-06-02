@@ -222,7 +222,8 @@ vjctl --music demo --meter
 Columns include scene, scene age, latest automatic effect, audio features,
 beat/phase estimates, clock phase, timing confidence, trigger decisions,
 pressure, trigger score, transition hit strength, aftershock strength,
-beat accent, aggression, density, LSD profile, LSD confidence, and LSD margin.
+beat accent, aggression, density, LSD profile, LSD confidence, LSD margin, and
+LSD shift.
 
 For an in-scene readout, run:
 
@@ -234,7 +235,7 @@ The debug overlay shows analyzer features, beat hints, clock state, scene, scene
 age, pressure, trigger score, model aggression/density, wave count, the latest
 beat accent, transition hit, aftershock strength, automatic effect, and active
 hold effects. With `--lsd`, it also shows the selected profile, confidence, and
-profile margin.
+profile margin. Stable profile changes also create a short LSD shift hit.
 
 ## Controls
 

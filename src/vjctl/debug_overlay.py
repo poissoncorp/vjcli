@@ -73,7 +73,10 @@ def _lsd(model: VJModel) -> str:
     theme = model.visual_theme
     if theme.confidence <= 0.0:
         return "WAIT"
-    return f"{theme.profile.upper()} C{theme.confidence:.2f} M{theme.margin:.2f}"
+    return (
+        f"{theme.profile.upper()} C{theme.confidence:.2f} "
+        f"M{theme.margin:.2f} S{model.lsd_shift:.2f}"
+    )
 
 
 def _last_auto(model: VJModel, now: float) -> str:
