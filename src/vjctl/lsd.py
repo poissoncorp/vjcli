@@ -21,6 +21,7 @@ class LsdTheme:
     kick_gain: float = 1.0
     haze: float = 0.0
     margin: float = 0.0
+    motif: str = "red"
 
 
 DEFAULT_THEME = LsdTheme(
@@ -38,6 +39,7 @@ DEFAULT_THEME = LsdTheme(
 PROFILES = {
     "velvet": LsdTheme(
         profile="velvet",
+        motif="mist",
         confidence=0.0,
         margin=0.0,
         primary=(255, 120, 180),
@@ -52,6 +54,7 @@ PROFILES = {
     ),
     "house": LsdTheme(
         profile="house",
+        motif="pulse",
         confidence=0.0,
         margin=0.0,
         primary=(255, 96, 155),
@@ -66,6 +69,7 @@ PROFILES = {
     ),
     "acid": LsdTheme(
         profile="acid",
+        motif="spark",
         confidence=0.0,
         margin=0.0,
         primary=(196, 255, 52),
@@ -80,6 +84,7 @@ PROFILES = {
     ),
     "spectral": LsdTheme(
         profile="spectral",
+        motif="ghost",
         confidence=0.0,
         margin=0.0,
         primary=(124, 236, 255),
@@ -94,6 +99,7 @@ PROFILES = {
     ),
     "industrial": LsdTheme(
         profile="industrial",
+        motif="forge",
         confidence=0.0,
         margin=0.0,
         primary=(255, 48, 62),
@@ -108,6 +114,7 @@ PROFILES = {
     ),
     "hard": LsdTheme(
         profile="hard",
+        motif="strike",
         confidence=0.0,
         margin=0.0,
         primary=(255, 32, 96),
@@ -205,6 +212,7 @@ def _with_confidence(theme: LsdTheme, confidence: float, margin: float = 0.0) ->
         speed_gain=theme.speed_gain,
         kick_gain=theme.kick_gain,
         haze=theme.haze,
+        motif=theme.motif,
     )
 
 

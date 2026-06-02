@@ -4,6 +4,7 @@ from .ansi import RESET, row_to_ansi
 from .buffer import FrameBuffer
 from .debug_overlay import DebugOverlay
 from .effect_renderers import EffectRenderers
+from .lsd_motifs import LsdMotifRenderer
 from .model import VJModel
 from .scene_renderer import SceneRenderer
 from .text_layer import TextLayer
@@ -16,6 +17,7 @@ class Renderer:
         self._text = TextLayer()
         self._effects = EffectRenderers()
         self._scene = SceneRenderer()
+        self._motifs = LsdMotifRenderer()
         self._waves = WaveRenderer()
         self._debug = DebugOverlay()
 
@@ -27,6 +29,7 @@ class Renderer:
         beat_time = model.beat_time
         self._effects.background(buffer, model, beat_time)
         self._scene.render(buffer, model, beat_time)
+        self._motifs.render(buffer, model, beat_time)
         self._waves.render(buffer, model, now)
         self._effects.effects(buffer, model, beat_time)
         self._text.hud(buffer, model, beat_time)

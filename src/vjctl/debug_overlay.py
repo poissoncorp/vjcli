@@ -75,7 +75,7 @@ def _lsd(model: VJModel) -> str:
         return "WAIT"
     return (
         f"{theme.profile.upper()} C{theme.confidence:.2f} "
-        f"M{theme.margin:.2f} S{model.lsd_shift:.2f}"
+        f"M{theme.margin:.2f} {theme.motif.upper()} S{model.lsd_shift:.2f}"
     )
 
 
