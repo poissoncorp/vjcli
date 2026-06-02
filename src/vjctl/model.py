@@ -82,6 +82,9 @@ class VJModel:
     )
     cooldown: float = 0.0
     status: str = "vjctl realm"
+    auto_scene: str = "idle"
+    auto_pressure: float = 0.0
+    auto_score: float = 0.0
     last_auto_effect: str = "-"
     last_auto_effect_at: float = -999.0
     rng: random.Random = field(default_factory=lambda: random.Random(901507))
@@ -173,6 +176,9 @@ class VJModel:
         reaction = self.music_reactor.react(frame, now, self.aggression, self.density)
         self.aggression = reaction.aggression
         self.density = reaction.density
+        self.auto_scene = reaction.scene
+        self.auto_pressure = reaction.pressure
+        self.auto_score = reaction.trigger_score
         if reaction.wave_strength is not None:
             self._spawn_wave(now, reaction.wave_strength)
         if reaction.effect_key is not None:

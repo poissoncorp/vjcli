@@ -156,14 +156,16 @@ That means audio can guide the free clock, but four steady manual taps still win
 Releasing effects or resetting to free roam does not restart the underlying loop
 or kill waves that are already travelling.
 
-Automatic effect selection is intentionally simple:
+Automatic effect selection is driven by a tiny scene director. It tracks pressure
+over time, classifies the current moment, and uses that scene to choose effects:
 
-- massive drive and density can trigger `1` overdrive
-- sharp spectral changes can trigger `7` chroma or `9` collapse
-- heavy bass onsets can trigger `8` quake
-- dense sections can trigger `3` pressure or `5` tunnel
-- bright motion can trigger `6` smear
-- clean hits fall back to `4` impact
+- `listen` keeps the app restrained
+- `drive` can trigger `3` pressure
+- `fault` can trigger `7` chroma
+- `weight` can trigger `5` tunnel
+- `rupture` can trigger `2` blackout or `9` collapse
+- `chaos` can trigger `1` overdrive or `8` quake
+- clean hits can still fall back to `4` impact
 
 `0` stays manual. It is the operator's free-roam reset, not an automatic music
 decision.
@@ -177,8 +179,8 @@ vjctl --meter
 vjctl --music demo --meter
 ```
 
-Columns include audio features, beat/phase estimates, clock phase, timing
-confidence, trigger decisions, aggression, and density.
+Columns include scene, audio features, beat/phase estimates, clock phase, timing
+confidence, trigger decisions, pressure, trigger score, aggression, and density.
 
 For an in-scene readout, run:
 
@@ -186,9 +188,9 @@ For an in-scene readout, run:
 vjctl --debug
 ```
 
-The debug overlay shows analyzer features, beat hints, clock state, model
-aggression/density, wave count, the latest automatic effect, and active hold
-effects.
+The debug overlay shows analyzer features, beat hints, clock state, scene,
+pressure, trigger score, model aggression/density, wave count, the latest
+automatic effect, and active hold effects.
 
 ## Controls
 

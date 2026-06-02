@@ -41,6 +41,7 @@ def _debug_lines(model: VJModel, now: float) -> list[str]:
             f"MODEL A{model.effective_aggression:.2f} "
             f"D{model.effective_density:.2f} WAVES {len(model.waves)}"
         ),
+        f"SCENE {model.auto_scene.upper()} P{model.auto_pressure:.2f} S{model.auto_score:.2f}",
         f"AUTO {_last_auto(model, now)}",
         f"FX {_active_effects(model)}",
     ]
@@ -49,6 +50,8 @@ def _debug_lines(model: VJModel, now: float) -> list[str]:
 def _style(line: str, index: int) -> tuple[Color, bool, bool]:
     if index == 0:
         return RED, True, False
+    if line.startswith("SCENE ") and "LISTEN" not in line and "IDLE" not in line:
+        return RED, False, False
     if line.startswith("AUTO ") and not line.endswith(" -"):
         return RED, False, False
     if line.startswith("FX ") and not line.endswith(" -"):

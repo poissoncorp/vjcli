@@ -19,8 +19,8 @@ from .renderer import Renderer
 from .sources import SimulatedMusicSource, SimulatedSocialSource
 
 METER_HEADER = (
-    "frame energy bass high dens onset change conf "
-    "bpm bphase bconf clock phase tconf trig aggr mdens\n"
+    "frame scene energy bass high dens onset change conf "
+    "bpm bphase bconf clock phase tconf trig pressure score aggr mdens\n"
 )
 
 
@@ -218,10 +218,14 @@ def _meter_line(index: int, frame: MusicFrame, model: VJModel, hit: bool) -> str
         timing.phase,
         timing.confidence,
         1.0 if hit else 0.0,
+        model.auto_pressure,
+        model.auto_score,
         model.effective_aggression,
         model.effective_density,
     )
-    return f"{index:05d} " + " ".join(f"{value:.3f}" for value in values) + "\n"
+    fields = [f"{index:05d}", model.auto_scene]
+    fields.extend(f"{value:.3f}" for value in values)
+    return " ".join(fields) + "\n"
 
 
 def _read_events(decoder: InputDecoder) -> list[InputEvent]:
