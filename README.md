@@ -169,6 +169,8 @@ over time, classifies the current moment, and uses that scene to choose effects:
 
 The director tracks scene age and avoids repeating the same automatic effect
 back-to-back, so a sustained section can escalate instead of looping one hit.
+Entering a strong scene can also spawn its own transition wave, even when the
+audio block is not a clean onset.
 
 `0` stays manual. It is the operator's free-roam reset, not an automatic music
 decision.
@@ -184,7 +186,7 @@ vjctl --music demo --meter
 
 Columns include scene, scene age, latest automatic effect, audio features,
 beat/phase estimates, clock phase, timing confidence, trigger decisions,
-pressure, trigger score, aggression, and density.
+pressure, trigger score, transition hit strength, aggression, and density.
 
 For an in-scene readout, run:
 
@@ -194,7 +196,7 @@ vjctl --debug
 
 The debug overlay shows analyzer features, beat hints, clock state, scene, scene
 age, pressure, trigger score, model aggression/density, wave count, the latest
-automatic effect, and active hold effects.
+transition hit, automatic effect, and active hold effects.
 
 ## Controls
 

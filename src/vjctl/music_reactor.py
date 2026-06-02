@@ -22,6 +22,7 @@ class MusicReaction:
     aggression: float
     density: float
     wave_strength: float | None = None
+    transition_strength: float | None = None
     effect_key: str | None = None
     scene: str = "idle"
     scene_age: float = 0.0
@@ -68,6 +69,11 @@ class MusicReactor:
         scene_age = self._set_scene(scene, now)
         scene_entered = scene_age == 0.0
         score = _trigger_score(frame, self.pressure)
+        transition_strength = (
+            _transition_strength(frame, scene, self.pressure)
+            if scene_entered and self.frames_seen > 1
+            else None
+        )
         next_aggression = _clamp(
             max(
                 DEFAULT_AGGRESSION,
@@ -90,6 +96,7 @@ class MusicReactor:
                 next_aggression,
                 next_density,
                 effect_key=effect_key,
+                transition_strength=transition_strength,
                 scene=scene,
                 scene_age=scene_age,
                 pressure=self.pressure,
@@ -100,6 +107,7 @@ class MusicReactor:
                 next_aggression,
                 next_density,
                 effect_key=effect_key,
+                transition_strength=transition_strength,
                 scene=scene,
                 scene_age=scene_age,
                 pressure=self.pressure,
@@ -114,6 +122,7 @@ class MusicReactor:
             next_aggression,
             next_density,
             wave_strength=strength,
+            transition_strength=transition_strength,
             effect_key=effect_key,
             scene=scene,
             scene_age=scene_age,
@@ -213,6 +222,22 @@ def _alternate_key(scene: str, key: str) -> str:
         "chaos": {"1": "8", "8": "9", "9": "2"},
     }
     return alternatives.get(scene, {}).get(key, key)
+
+
+def _transition_strength(frame: MusicFrame, scene: str, pressure: float) -> float | None:
+    if scene in ("idle", "listen"):
+        return None
+    base = {
+        "drive": 0.36,
+        "fault": 0.42,
+        "weight": 0.50,
+        "rupture": 0.72,
+        "chaos": 0.88,
+    }.get(scene)
+    if base is None:
+        return None
+    strength = base + pressure * 0.20 + frame.change * 0.14 + frame.bass * 0.08
+    return _clamp(strength)
 
 
 def _follow(current: float, target: float, amount: float) -> float:

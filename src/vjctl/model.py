@@ -86,6 +86,7 @@ class VJModel:
     auto_scene_age: float = 0.0
     auto_pressure: float = 0.0
     auto_score: float = 0.0
+    auto_transition_strength: float = 0.0
     last_auto_effect: str = "-"
     last_auto_effect_at: float = -999.0
     rng: random.Random = field(default_factory=lambda: random.Random(901507))
@@ -181,8 +182,11 @@ class VJModel:
         self.auto_scene_age = reaction.scene_age
         self.auto_pressure = reaction.pressure
         self.auto_score = reaction.trigger_score
+        self.auto_transition_strength = reaction.transition_strength or 0.0
         if reaction.wave_strength is not None:
             self._spawn_wave(now, reaction.wave_strength)
+        if reaction.transition_strength is not None:
+            self._spawn_wave(now, reaction.transition_strength)
         if reaction.effect_key is not None:
             self._trigger_key(reaction.effect_key, now, True)
             return
