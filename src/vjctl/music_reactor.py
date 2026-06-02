@@ -170,7 +170,15 @@ class MusicReaction:
     scene_age: float = 0.0
     pressure: float = 0.0
     trigger_score: float = 0.0
+    contrast: float = 0.0
+    lift: float = 0.0
     status: str | None = None
+
+
+@dataclass(frozen=True)
+class MusicDynamics:
+    contrast: float = 0.0
+    lift: float = 0.0
 
 
 @dataclass
@@ -185,6 +193,10 @@ class MusicReactor:
     effect_repeat: int = 0
     frames_seen: int = 0
     pressure: float = 0.0
+    baseline_drive: float = 0.0
+    baseline_mass: float = 0.0
+    baseline_change: float = 0.0
+    dynamics_ready: bool = False
 
     def react(
         self,
@@ -197,6 +209,7 @@ class MusicReactor:
         dt = self._frame_dt(now)
         if frame.confidence < self.tuning.confidence_threshold:
             self.frames_seen = 0
+            self.dynamics_ready = False
             self.pressure = _follow(self.pressure, 0.0, _attack(dt, 0.8))
             return MusicReaction(
                 _follow(aggression, DEFAULT_AGGRESSION, 0.05),
@@ -208,22 +221,28 @@ class MusicReactor:
 
         self.frames_seen += 1
         response = _tempo_response(frame)
-        self._update_pressure(frame, dt, response, mood)
-        scene = self._stabilized_scene(_scene(frame, self.pressure, response, mood), frame, now)
+        dynamics = self._update_dynamics(frame, dt)
+        self._update_pressure(frame, dt, response, mood, dynamics)
+        scene = self._stabilized_scene(
+            _scene(frame, self.pressure, response, mood, dynamics),
+            frame,
+            now,
+        )
         scene_age = self._set_scene(scene, now)
         scene_entered = scene_age == 0.0
-        score = _trigger_score(frame, self.pressure, response)
+        score = _trigger_score(frame, self.pressure, response, dynamics)
         transition_strength = (
-            _transition_strength(frame, scene, self.pressure, response, mood)
+            _transition_strength(frame, scene, self.pressure, response, mood, dynamics)
             if scene_entered and self.frames_seen > 1
             else None
         )
+        dynamic_weight = 0.72 + dynamics.contrast * 0.42
         aggression_lift = (
-            frame.drive * (0.34 + response * 0.28)
+            frame.drive * dynamic_weight * (0.34 + response * 0.28)
             + self.pressure * (0.14 + response * 0.14)
         )
         density_lift = (
-            frame.mass * (0.30 + response * 0.20)
+            frame.mass * dynamic_weight * (0.30 + response * 0.20)
             + self.pressure * (0.10 + response * 0.10)
         )
         next_aggression = _clamp(
@@ -262,6 +281,8 @@ class MusicReactor:
                 scene_age=scene_age,
                 pressure=self.pressure,
                 trigger_score=score,
+                contrast=dynamics.contrast,
+                lift=dynamics.lift,
             )
         onset_debounce = self.tuning.onset_debounce + (1.0 - response) * 0.18
         if now - self.last_onset_at < onset_debounce:
@@ -274,9 +295,11 @@ class MusicReactor:
                 scene_age=scene_age,
                 pressure=self.pressure,
                 trigger_score=score,
+                contrast=dynamics.contrast,
+                lift=dynamics.lift,
             )
 
-        strength = _wave_strength(frame, response, mood)
+        strength = _wave_strength(frame, response, mood, dynamics)
         self.last_onset_at = now
         return MusicReaction(
             next_aggression,
@@ -288,6 +311,8 @@ class MusicReactor:
             scene_age=scene_age,
             pressure=self.pressure,
             trigger_score=score,
+            contrast=dynamics.contrast,
+            lift=dynamics.lift,
             status=f"MUSIC {scene.upper()}",
         )
 
@@ -327,6 +352,7 @@ class MusicReactor:
         dt: float,
         response: float,
         mood: MusicMood | None,
+        dynamics: MusicDynamics,
     ) -> None:
         target = _clamp(
             frame.drive * 0.32
@@ -335,9 +361,33 @@ class MusicReactor:
             + frame.onset * 0.10
         )
         target *= 0.56 + response * 0.44
+        target *= 0.78 + dynamics.contrast * 0.44
         target *= _mood_scale(mood, "pressure")
         speed = (3.4 + response * 3.6) if target > self.pressure else 1.2
         self.pressure = _follow(self.pressure, target, _attack(dt, speed))
+
+    def _update_dynamics(self, frame: MusicFrame, dt: float) -> MusicDynamics:
+        if not self.dynamics_ready:
+            self.baseline_drive = frame.drive
+            self.baseline_mass = frame.mass
+            self.baseline_change = frame.change
+            self.dynamics_ready = True
+            return MusicDynamics()
+        drive_lift = _lift(frame.drive, self.baseline_drive)
+        mass_lift = _lift(frame.mass, self.baseline_mass)
+        change_lift = _lift(frame.change, self.baseline_change)
+        lift = _clamp(drive_lift * 0.52 + mass_lift * 0.22 + change_lift * 0.26)
+        contrast = _clamp(
+            max(
+                lift,
+                drive_lift * 0.46 + frame.onset * 0.18,
+                change_lift * 0.64 + frame.onset * 0.12,
+            )
+        )
+        self.baseline_drive = _baseline(self.baseline_drive, frame.drive, dt)
+        self.baseline_mass = _baseline(self.baseline_mass, frame.mass, dt)
+        self.baseline_change = _baseline(self.baseline_change, frame.change, dt)
+        return MusicDynamics(contrast, lift)
 
     def _effect_key(
         self,
@@ -530,6 +580,7 @@ def _transition_strength(
     pressure: float,
     response: float,
     mood: MusicMood | None,
+    dynamics: MusicDynamics,
 ) -> float | None:
     if scene in ("idle", "listen"):
         return None
@@ -544,6 +595,7 @@ def _transition_strength(
         return None
     strength = base + pressure * 0.16 + frame.change * 0.10 + frame.bass * 0.06
     strength *= 0.58 + response * 0.42
+    strength *= 0.72 + dynamics.contrast * 0.42
     strength *= _mood_scale(mood, "transition")
     return _clamp(strength)
 
@@ -560,20 +612,31 @@ def _blend(current: float, target: float, amount: float) -> float:
     return current + (target - current) * amount
 
 
+def _baseline(current: float, target: float, dt: float) -> float:
+    speed = 0.34 if target > current else 1.10
+    return _follow(current, target, _attack(dt, speed))
+
+
+def _lift(current: float, baseline: float) -> float:
+    return _clamp((current - baseline) / max(0.18, 1.0 - baseline))
+
+
 def _scene(
     frame: MusicFrame,
     pressure: float,
     response: float,
     mood: MusicMood | None = None,
+    dynamics: MusicDynamics = MusicDynamics(),
 ) -> str:
     restraint = 1.0 - response
-    rupture_change = 0.72 + restraint * 0.14
-    rupture_onset = 0.62 + restraint * 0.10
-    chaos_pressure = 0.72 + restraint * 0.14
-    chaos_drive = 0.86 + restraint * 0.08
-    weight_mass = 0.58 + restraint * 0.08
-    drive_amount = 0.42 + restraint * 0.10
-    drive_pressure = 0.38 + restraint * 0.10
+    context = 1.0 - dynamics.contrast
+    rupture_change = 0.72 + restraint * 0.14 + context * 0.08
+    rupture_onset = 0.62 + restraint * 0.10 + context * 0.06
+    chaos_pressure = 0.72 + restraint * 0.14 + context * 0.06
+    chaos_drive = 0.86 + restraint * 0.08 + context * 0.04
+    weight_mass = 0.58 + restraint * 0.08 + context * 0.03
+    drive_amount = 0.42 + restraint * 0.10 + context * 0.04
+    drive_pressure = 0.38 + restraint * 0.10 + context * 0.03
     scene = "listen"
     if frame.change > rupture_change and frame.onset > rupture_onset:
         scene = "rupture"
@@ -617,8 +680,13 @@ def _scene_breaks_hold(scene: str, frame: MusicFrame, pressure: float) -> bool:
     return False
 
 
-def _trigger_score(frame: MusicFrame, pressure: float, response: float) -> float:
-    return _clamp(
+def _trigger_score(
+    frame: MusicFrame,
+    pressure: float,
+    response: float,
+    dynamics: MusicDynamics,
+) -> float:
+    score = _clamp(
         max(
             frame.onset * (0.58 + response * 0.42),
             frame.change * (0.52 + response * 0.42),
@@ -627,12 +695,19 @@ def _trigger_score(frame: MusicFrame, pressure: float, response: float) -> float
             + frame.change * (0.10 + response * 0.08),
         )
     )
+    return _clamp(score * (0.62 + dynamics.contrast * 0.54) + dynamics.lift * 0.18)
 
 
-def _wave_strength(frame: MusicFrame, response: float, mood: MusicMood | None) -> float:
+def _wave_strength(
+    frame: MusicFrame,
+    response: float,
+    mood: MusicMood | None,
+    dynamics: MusicDynamics,
+) -> float:
     raw = frame.onset * 0.66 + frame.bass * 0.22 + frame.change * 0.12
     floor = 0.24 + response * 0.10
     strength = max(floor, raw * (0.56 + response * 0.44))
+    strength *= 0.70 + dynamics.contrast * 0.50
     return _clamp(strength * _mood_scale(mood, "wave"))
 
 

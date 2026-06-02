@@ -166,6 +166,9 @@ The model uses those values in two ways:
   whether to spawn an onset wave or fire an automatic effect from `1-9`.
   In `--lsd`, it also uses the detected character values to bias scene choice,
   effect timing, and selection.
+- `MusicReactor` also tracks local dynamics. It compares the current frame
+  against a slow baseline, so AutoVJ reacts to contrast inside the current track
+  instead of treating every loud normalized input as a drop.
 - `TempoClock` accepts confident audio BPM/phase hints while still respecting
   manual lock.
 - `LsdDirector` classifies the musical climate when `--lsd` is enabled and
@@ -196,6 +199,9 @@ flickering between modes every analyzer frame.
 Slower, oldschool-tempo material gets extra restraint: kicks can still create
 visible waves, but automatic effects need stronger evidence before escalating
 into rupture or chaos.
+Local dynamics add another restraint layer: sustained loud sections can hold
+pressure, but automatic hits need contrast or lift relative to the recent
+baseline before they escalate.
 
 `0` stays manual. It is the operator's free-roam reset, not an automatic music
 decision.
@@ -241,9 +247,9 @@ vjctl --music demo --meter
 
 Columns include scene, scene age, latest automatic effect, audio features,
 beat/phase estimates, clock phase, timing confidence, trigger decisions,
-pressure, trigger score, transition hit strength, aftershock strength,
-beat accent, aggression, density, LSD profile, LSD confidence, LSD certainty,
-LSD margin, and LSD shift.
+pressure, trigger score, local dynamic contrast, local lift, transition hit
+strength, aftershock strength, beat accent, aggression, density, LSD profile,
+LSD confidence, LSD certainty, LSD margin, and LSD shift.
 
 For an in-scene readout, run:
 
@@ -253,10 +259,10 @@ vjctl --debug
 
 The debug overlay shows analyzer features, beat hints, clock state, scene, scene
 age, pressure, trigger score, model aggression/density, wave count, the latest
-beat accent, transition hit, aftershock strength, automatic effect, and active
-hold effects. With `--lsd`, it also shows the selected profile, confidence,
-certainty, profile margin, and motif. Stable profile changes also create a short
-LSD shift hit.
+beat accent, local dynamic contrast/lift, transition hit, aftershock strength,
+automatic effect, and active hold effects. With `--lsd`, it also shows the
+selected profile, confidence, certainty, profile margin, and motif. Stable
+profile changes also create a short LSD shift hit.
 
 ## Controls
 

@@ -21,7 +21,7 @@ from .sources import SimulatedMusicSource, SimulatedSocialSource
 METER_HEADER = (
     "frame scene sage auto lsd lmotif lconf lcert lmargin lshift lpace limpact "
     "lweight lgrit lspark lspace lmotion energy bass high dens onset change conf "
-    "bpm bphase bconf clock phase tconf trig pressure score thit ahit "
+    "bpm bphase bconf clock phase tconf trig pressure score dyn lift thit ahit "
     "baccent aggr mdens\n"
 )
 
@@ -246,6 +246,8 @@ def _meter_line(index: int, frame: MusicFrame, model: VJModel, hit: bool) -> str
         1.0 if hit else 0.0,
         model.auto_pressure,
         model.auto_score,
+        model.auto_contrast,
+        model.auto_lift,
         model.auto_transition_strength,
         model.auto_hit,
         model.beat_accent,

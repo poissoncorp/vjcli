@@ -90,6 +90,8 @@ class VJModel:
     auto_scene_age: float = 0.0
     auto_pressure: float = 0.0
     auto_score: float = 0.0
+    auto_contrast: float = 0.0
+    auto_lift: float = 0.0
     auto_transition_strength: float = 0.0
     auto_hit: float = 0.0
     lsd_shift: float = 0.0
@@ -234,6 +236,8 @@ class VJModel:
         self.auto_scene_age = reaction.scene_age
         self.auto_pressure = reaction.pressure
         self.auto_score = reaction.trigger_score
+        self.auto_contrast = reaction.contrast
+        self.auto_lift = reaction.lift
         self.auto_transition_strength = reaction.transition_strength or 0.0
         if reaction.wave_strength is not None:
             self._spawn_wave(now, reaction.wave_strength)
