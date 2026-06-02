@@ -7,17 +7,8 @@ from .clock import TempoClock
 from .effects import EFFECTS, EFFECT_BY_KEY
 from .events import SocialIncoming
 from .music import MusicFrame
+from .music_reactor import DEFAULT_AGGRESSION, DEFAULT_DENSITY, MusicReactor
 from .timing import TimingState
-
-DEFAULT_AGGRESSION = 0.10
-DEFAULT_DENSITY = 0.10
-
-
-@dataclass(frozen=True)
-class MusicTuning:
-    confidence_threshold: float = 0.08
-    onset_threshold: float = 0.58
-    onset_debounce: float = 0.12
 
 
 @dataclass
@@ -84,14 +75,13 @@ class VJModel:
     socials: list[SocialEvent] = field(default_factory=list)
     waves: list[Wave] = field(default_factory=list)
     music: MusicFrame = field(default_factory=MusicFrame)
-    music_tuning: MusicTuning = field(default_factory=MusicTuning)
+    music_reactor: MusicReactor = field(default_factory=MusicReactor)
     effects: dict[str, HoldEffect] = field(
         default_factory=lambda: {effect.name: HoldEffect(effect.name) for effect in EFFECTS}
     )
     cooldown: float = 0.0
     status: str = "vjctl realm"
     rng: random.Random = field(default_factory=lambda: random.Random(901507))
-    last_music_onset_at: float = -999.0
 
     def update(self, dt: float, now: float) -> bool:
         beat = self.clock.update(dt)
@@ -177,20 +167,14 @@ class VJModel:
     def apply_music(self, frame: MusicFrame, now: float) -> None:
         self.music = frame
         self.clock.suggest_bpm(frame.beat_bpm, frame.beat_confidence)
-        if frame.confidence < self.music_tuning.confidence_threshold:
-            self.aggression = _follow(self.aggression, DEFAULT_AGGRESSION, 0.05)
-            self.density = _follow(self.density, DEFAULT_DENSITY, 0.05)
+        reaction = self.music_reactor.react(frame, now, self.aggression, self.density)
+        self.aggression = reaction.aggression
+        self.density = reaction.density
+        if reaction.wave_strength is None:
             return
-        self.aggression = _clamp(max(DEFAULT_AGGRESSION, DEFAULT_AGGRESSION + frame.drive * 0.84))
-        self.density = _clamp(max(DEFAULT_DENSITY, DEFAULT_DENSITY + frame.mass * 0.62))
-        if frame.onset < self.music_tuning.onset_threshold:
-            return
-        if now - self.last_music_onset_at < self.music_tuning.onset_debounce:
-            return
-        strength = _clamp(max(0.34, frame.onset * 0.82 + frame.bass * 0.28 + frame.change * 0.18))
-        self._spawn_wave(now, strength)
-        self.last_music_onset_at = now
-        self.status = "MUSIC ONSET"
+        self._spawn_wave(now, reaction.wave_strength)
+        if reaction.status is not None:
+            self.status = reaction.status
 
     def hold(self, key_id: str, now: float = 0.0) -> None:
         spec = EFFECT_BY_KEY.get(key_id)
@@ -293,11 +277,3 @@ class VJModel:
         born_at = now + offset_beats * beat_seconds
         lifetime = lifetime_beats * beat_seconds
         self.waves.append(Wave(born_at, strength, aggression, density, lifetime))
-
-
-def _follow(current: float, target: float, amount: float) -> float:
-    return current + (target - current) * amount
-
-
-def _clamp(value: float) -> float:
-    return max(0.0, min(1.0, float(value)))

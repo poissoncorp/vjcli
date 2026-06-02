@@ -5,7 +5,7 @@ import sys
 
 from .audio_input import audio_device_lines
 from .app import render_preview, run, run_meter
-from .model import MusicTuning
+from .music_reactor import MusicTuning
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

@@ -12,8 +12,9 @@ from .ansi import ALT_SCREEN, CLEAR, HIDE_CURSOR, MAIN_SCREEN, RESET, SHOW_CURSO
 from .audio_input import AudioInputSource
 from .effects import EFFECT_BY_KEY
 from .input import InputDecoder, InputEvent
-from .model import MusicTuning, VJModel
+from .model import VJModel
 from .music import MusicFrame, MusicSource
+from .music_reactor import MusicReactor, MusicTuning
 from .renderer import Renderer
 from .sources import SimulatedMusicSource, SimulatedSocialSource
 
@@ -53,7 +54,7 @@ def run(
         sys.stderr.write(f"{error}\n")
         return 2
 
-    model = VJModel(music_tuning=music_tuning or MusicTuning())
+    model = _model(music_tuning)
     renderer = Renderer()
     decoder = InputDecoder()
     social_source = SimulatedSocialSource()
@@ -104,7 +105,7 @@ def render_preview(
     music: str = "none",
     music_tuning: MusicTuning | None = None,
 ) -> str:
-    model = VJModel(music_tuning=music_tuning or MusicTuning())
+    model = _model(music_tuning)
     renderer = Renderer()
     social_source = SimulatedSocialSource()
     music_source = _music_source(music if music == "demo" else "none")
@@ -145,7 +146,7 @@ def run_meter(
         return 2
     if source is None:
         return 2
-    model = VJModel(music_tuning=music_tuning or MusicTuning())
+    model = _model(music_tuning)
     interval = 1.0 / max(1, fps)
     next_at = time.monotonic()
     sys.stdout.write(
@@ -181,6 +182,10 @@ def _close_source(source: MusicSource | None) -> None:
     close = getattr(source, "close", None)
     if close is not None:
         close()
+
+
+def _model(music_tuning: MusicTuning | None = None) -> VJModel:
+    return VJModel(music_reactor=MusicReactor(music_tuning or MusicTuning()))
 
 
 def _poll_music(model: VJModel, source: MusicSource | None, now: float) -> None:
