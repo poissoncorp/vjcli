@@ -171,6 +171,8 @@ The director tracks scene age and avoids repeating the same automatic effect
 back-to-back, so a sustained section can escalate instead of looping one hit.
 Entering a strong scene can also spawn its own transition wave, even when the
 audio block is not a clean onset.
+Scenes hold briefly before demoting, so AutoVJ keeps stage weight instead of
+flickering between modes every analyzer frame.
 
 `0` stays manual. It is the operator's free-roam reset, not an automatic music
 decision.

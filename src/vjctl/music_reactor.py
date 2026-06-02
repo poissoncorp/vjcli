@@ -7,6 +7,14 @@ from .music import MusicFrame
 DEFAULT_AGGRESSION = 0.10
 DEFAULT_DENSITY = 0.10
 
+SCENE_HOLD = {
+    "drive": 0.34,
+    "fault": 0.30,
+    "weight": 0.38,
+    "rupture": 0.28,
+    "chaos": 0.42,
+}
+
 
 @dataclass(frozen=True)
 class MusicTuning:
@@ -65,7 +73,7 @@ class MusicReactor:
 
         self.frames_seen += 1
         self._update_pressure(frame, dt)
-        scene = _scene(frame, self.pressure)
+        scene = self._stabilized_scene(_scene(frame, self.pressure), frame, now)
         scene_age = self._set_scene(scene, now)
         scene_entered = scene_age == 0.0
         score = _trigger_score(frame, self.pressure)
@@ -139,6 +147,19 @@ class MusicReactor:
         if self.scene_started_at < 0.0:
             self.scene_started_at = now
         return max(0.0, now - self.scene_started_at)
+
+    def _stabilized_scene(self, scene: str, frame: MusicFrame, now: float) -> str:
+        current = self.last_scene
+        if scene == current or current in ("idle", "listen"):
+            return scene
+        if _scene_breaks_hold(scene, frame, self.pressure):
+            return scene
+        if self.scene_started_at < 0.0:
+            return scene
+        age = max(0.0, now - self.scene_started_at)
+        if age >= SCENE_HOLD.get(current, 0.0):
+            return scene
+        return current
 
     def _frame_dt(self, now: float) -> float:
         if self.last_frame_at < 0.0:
@@ -260,6 +281,14 @@ def _scene(frame: MusicFrame, pressure: float) -> str:
     if frame.drive > 0.42 or pressure > 0.38:
         return "drive"
     return "listen"
+
+
+def _scene_breaks_hold(scene: str, frame: MusicFrame, pressure: float) -> bool:
+    if scene == "rupture":
+        return True
+    if scene == "chaos":
+        return pressure > 0.78 or frame.drive > 0.88
+    return False
 
 
 def _trigger_score(frame: MusicFrame, pressure: float) -> float:
