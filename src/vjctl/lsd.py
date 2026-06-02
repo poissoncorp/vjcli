@@ -20,11 +20,13 @@ class LsdTheme:
     speed_gain: float = 1.0
     kick_gain: float = 1.0
     haze: float = 0.0
+    margin: float = 0.0
 
 
 DEFAULT_THEME = LsdTheme(
     profile="red",
     confidence=0.0,
+    margin=0.0,
     primary=RED,
     accent=ASH,
     ghost=ASH,
@@ -37,6 +39,7 @@ PROFILES = {
     "velvet": LsdTheme(
         profile="velvet",
         confidence=0.0,
+        margin=0.0,
         primary=(255, 120, 180),
         accent=(255, 196, 110),
         ghost=(190, 150, 230),
@@ -50,6 +53,7 @@ PROFILES = {
     "house": LsdTheme(
         profile="house",
         confidence=0.0,
+        margin=0.0,
         primary=(255, 96, 155),
         accent=(255, 178, 86),
         ghost=(120, 224, 205),
@@ -63,6 +67,7 @@ PROFILES = {
     "acid": LsdTheme(
         profile="acid",
         confidence=0.0,
+        margin=0.0,
         primary=(196, 255, 52),
         accent=(255, 238, 62),
         ghost=(68, 255, 188),
@@ -76,6 +81,7 @@ PROFILES = {
     "spectral": LsdTheme(
         profile="spectral",
         confidence=0.0,
+        margin=0.0,
         primary=(124, 236, 255),
         accent=(220, 236, 255),
         ghost=(186, 138, 255),
@@ -89,6 +95,7 @@ PROFILES = {
     "industrial": LsdTheme(
         profile="industrial",
         confidence=0.0,
+        margin=0.0,
         primary=(255, 48, 62),
         accent=(180, 198, 210),
         ghost=(255, 120, 86),
@@ -102,6 +109,7 @@ PROFILES = {
     "hard": LsdTheme(
         profile="hard",
         confidence=0.0,
+        margin=0.0,
         primary=(255, 32, 96),
         accent=(255, 236, 236),
         ghost=(255, 150, 46),
@@ -113,6 +121,8 @@ PROFILES = {
         haze=0.04,
     ),
 }
+
+SWITCH_MARGIN = 0.065
 
 
 @dataclass
@@ -129,9 +139,10 @@ class LsdDirector:
         targets = _scores(frame, timing)
         for name, target in targets.items():
             self.scores[name] = _follow(self.scores.get(name, 0.0), target, 0.10)
-        name = max(self.scores, key=lambda item: self.scores[item])
-        confidence = _clamp(self.scores[name] * frame.confidence)
-        self.theme = _with_confidence(PROFILES[name], confidence)
+        name = _select_profile(self.scores, self.theme)
+        margin = _margin(self.scores, name)
+        confidence = _confidence(self.scores[name], margin, frame.confidence)
+        self.theme = _with_confidence(PROFILES[name], confidence, margin)
         return self.theme
 
 
@@ -156,10 +167,35 @@ def _tempo_amount(bpm: float) -> float:
     return _clamp((float(bpm) - 96.0) / 72.0)
 
 
-def _with_confidence(theme: LsdTheme, confidence: float) -> LsdTheme:
+def _select_profile(scores: dict[str, float], theme: LsdTheme) -> str:
+    leader = max(scores, key=lambda item: scores[item])
+    current = theme.profile
+    if current not in scores or current == leader:
+        return leader
+    if theme.confidence <= 0.12:
+        return leader
+    if scores[leader] - scores[current] >= SWITCH_MARGIN:
+        return leader
+    return current
+
+
+def _margin(scores: dict[str, float], name: str) -> float:
+    others = [score for item, score in scores.items() if item != name]
+    if not others:
+        return scores[name]
+    return scores[name] - max(others)
+
+
+def _confidence(score: float, margin: float, frame_confidence: float) -> float:
+    certainty = 0.56 + max(0.0, margin) * 1.8
+    return _clamp(score * frame_confidence * certainty)
+
+
+def _with_confidence(theme: LsdTheme, confidence: float, margin: float = 0.0) -> LsdTheme:
     return LsdTheme(
         profile=theme.profile,
         confidence=_clamp(confidence),
+        margin=margin,
         primary=theme.primary,
         accent=theme.accent,
         ghost=theme.ghost,
