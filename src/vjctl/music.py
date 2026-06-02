@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol
 
 
 @dataclass(frozen=True)
@@ -28,3 +29,8 @@ class MusicFrame:
 
 def _clamp(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
+
+
+class MusicSource(Protocol):
+    def poll(self, now: float) -> MusicFrame | None:
+        ...

@@ -8,12 +8,13 @@ import termios
 import time
 import tty
 
+from .ansi import ALT_SCREEN, CLEAR, HIDE_CURSOR, MAIN_SCREEN, RESET, SHOW_CURSOR
 from .effects import EFFECT_BY_KEY
 from .input import InputDecoder, InputEvent
 from .model import VJModel
-from .ansi import ALT_SCREEN, CLEAR, HIDE_CURSOR, MAIN_SCREEN, RESET, SHOW_CURSOR
+from .music import MusicSource
 from .renderer import Renderer
-from .sources import SimulatedSocialSource
+from .sources import SimulatedMusicSource, SimulatedSocialSource
 
 
 class TerminalSession:
@@ -35,15 +36,18 @@ class TerminalSession:
             termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original)
 
 
-def run() -> int:
+def run(music: str = "none") -> int:
     if not sys.stdin.isatty() or not sys.stdout.isatty():
-        sys.stderr.write("vjctl needs an interactive terminal. Use --preview-frames for text preview.\n")
+        sys.stderr.write(
+            "vjctl needs an interactive terminal. Use --preview-frames for text preview.\n"
+        )
         return 2
 
     model = VJModel()
     renderer = Renderer()
     decoder = InputDecoder()
-    sources = [SimulatedSocialSource()]
+    social_source = SimulatedSocialSource()
+    music_source = _music_source(music)
     target_dt = 1.0 / 60.0
     last_frame = time.monotonic()
     last_esc_check = last_frame
@@ -66,9 +70,9 @@ def run() -> int:
                     last_esc_check = now
 
                 model.update(dt, now)
-                for source in sources:
-                    for event in source.poll(now, model.cooldown):
-                        model.apply_event(event, now)
+                _poll_music(model, music_source, now)
+                for event in social_source.poll(now, model.cooldown):
+                    model.apply_event(event, now)
                 size = shutil.get_terminal_size((132, 36))
                 frame = renderer.render(model, size.columns, size.lines, now)
                 sys.stdout.write(renderer.flush(frame))
@@ -81,10 +85,11 @@ def run() -> int:
         return 0
 
 
-def render_preview(frames: int, width: int, height: int, fps: int = 12) -> str:
+def render_preview(frames: int, width: int, height: int, fps: int = 12, music: str = "none") -> str:
     model = VJModel()
     renderer = Renderer()
-    source = SimulatedSocialSource()
+    social_source = SimulatedSocialSource()
+    music_source = _music_source(music)
     lines: list[str] = []
     now = 0.0
     dt = 1.0 / max(1, fps)
@@ -92,7 +97,8 @@ def render_preview(frames: int, width: int, height: int, fps: int = 12) -> str:
     model.submit_prompt(now)
     for index in range(max(0, frames)):
         beat = model.update(dt, now)
-        for event in source.poll(now, model.cooldown):
+        _poll_music(model, music_source, now)
+        for event in social_source.poll(now, model.cooldown):
             model.apply_event(event, now)
         if beat and index % 8 == 0:
             model.hold("3", now)
@@ -102,6 +108,20 @@ def render_preview(frames: int, width: int, height: int, fps: int = 12) -> str:
         lines.append("")
         now += dt
     return "\n".join(lines)
+
+
+def _music_source(name: str) -> MusicSource | None:
+    if name == "demo":
+        return SimulatedMusicSource()
+    return None
+
+
+def _poll_music(model: VJModel, source: MusicSource | None, now: float) -> None:
+    if source is None:
+        return
+    frame = source.poll(now)
+    if frame is not None:
+        model.apply_music(frame, now)
 
 
 def _read_events(decoder: InputDecoder) -> list[InputEvent]:

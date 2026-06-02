@@ -32,6 +32,12 @@ Then run it from anywhere:
 vjctl
 ```
 
+Or run with a synthetic music-reactive feed:
+
+```bash
+vjctl --music demo
+```
+
 Or run from the repo without installing:
 
 ```bash
