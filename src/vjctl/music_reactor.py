@@ -15,64 +15,55 @@ SCENE_HOLD = {
     "chaos": 0.42,
 }
 
-PROFILE_EFFECTS = {
+PROFILE_EFFECT_DECKS = {
     "velvet": {
-        "listen": "4",
-        "drive": "6",
-        "fault": "6",
-        "weight": "5",
-        "rupture": "9",
-        "chaos": "8",
+        "listen": ("4",),
+        "drive": ("6", "4"),
+        "fault": ("6", "7"),
+        "weight": ("5", "6"),
+        "rupture": ("9", "8"),
+        "chaos": ("8", "9"),
     },
     "house": {
-        "listen": "4",
-        "drive": "3",
-        "fault": "6",
-        "weight": "5",
-        "rupture": "4",
-        "chaos": "8",
+        "listen": ("4",),
+        "drive": ("3", "4"),
+        "fault": ("6", "7"),
+        "weight": ("5", "3"),
+        "rupture": ("4", "8", "9"),
+        "chaos": ("8", "4", "9"),
     },
     "acid": {
-        "listen": "7",
-        "drive": "6",
-        "fault": "7",
-        "weight": "7",
-        "rupture": "9",
-        "chaos": "1",
+        "listen": ("7",),
+        "drive": ("7", "6"),
+        "fault": ("7", "6", "9"),
+        "weight": ("7", "5"),
+        "rupture": ("9", "7", "1"),
+        "chaos": ("1", "8", "7"),
     },
     "spectral": {
-        "listen": "4",
-        "drive": "6",
-        "fault": "7",
-        "weight": "5",
-        "rupture": "9",
-        "chaos": "8",
+        "listen": ("4",),
+        "drive": ("6", "4"),
+        "fault": ("7", "6"),
+        "weight": ("5", "6"),
+        "rupture": ("9", "8"),
+        "chaos": ("8", "9"),
     },
     "industrial": {
-        "listen": "6",
-        "drive": "6",
-        "fault": "7",
-        "weight": "8",
-        "rupture": "2",
-        "chaos": "1",
+        "listen": ("6",),
+        "drive": ("6", "7"),
+        "fault": ("7", "8"),
+        "weight": ("8", "5"),
+        "rupture": ("2", "8", "9"),
+        "chaos": ("8", "1", "2"),
     },
     "hard": {
-        "listen": "3",
-        "drive": "1",
-        "fault": "7",
-        "weight": "8",
-        "rupture": "2",
-        "chaos": "1",
+        "listen": ("3",),
+        "drive": ("3", "1"),
+        "fault": ("7", "1"),
+        "weight": ("8", "2"),
+        "rupture": ("2", "8", "1"),
+        "chaos": ("1", "8", "9"),
     },
-}
-
-PROFILE_ALTERNATES = {
-    "velvet": {"6": "4", "4": "5", "5": "6", "8": "9", "9": "8"},
-    "house": {"3": "4", "4": "5", "5": "3", "6": "4", "8": "5"},
-    "acid": {"7": "6", "6": "7", "9": "7", "1": "8"},
-    "spectral": {"4": "6", "6": "7", "7": "4", "5": "8", "9": "8"},
-    "industrial": {"6": "7", "7": "8", "8": "2", "2": "9", "1": "8"},
-    "hard": {"1": "8", "8": "2", "2": "9", "9": "1", "7": "1"},
 }
 
 
@@ -383,6 +374,8 @@ class MusicReactor:
 
     def _avoid_repeat(self, key: str, scene: str, mood: MusicMood | None) -> str:
         if key != self.last_effect_key or self.effect_repeat < 1:
+            if key == self.last_effect_key and _profile_deck(scene, mood):
+                return _alternate_key(scene, key, mood)
             return key
         return _alternate_key(scene, key, mood)
 
@@ -405,14 +398,13 @@ def _candidate_key(
         key = _mood_key(scene, pressure, mood)
         if key is not None:
             return key
+        key = _profile_key(scene, scene_age, pressure, mood)
+        if key is not None:
+            return key
     if scene == "chaos" and frame.drive > 0.78 and frame.mass > 0.58:
         return "1"
     if scene == "rupture" and pressure > 0.68 and scene_age < 0.90:
         return "2"
-    if mood is not None:
-        key = PROFILE_EFFECTS.get(mood.profile, {}).get(scene)
-        if key is not None:
-            return key
     if scene == "rupture" and pressure > 0.62:
         return "1"
     if scene == "rupture":
@@ -446,10 +438,38 @@ def _mood_key(scene: str, pressure: float, mood: MusicMood) -> str | None:
     return None
 
 
+def _profile_key(
+    scene: str,
+    scene_age: float,
+    pressure: float,
+    mood: MusicMood,
+) -> str | None:
+    if _mood_certainty(mood) < 0.18:
+        return None
+    deck = _profile_deck(scene, mood)
+    if not deck:
+        return None
+    intensity = _clamp(
+        pressure * 0.46
+        + mood.impact * 0.18
+        + mood.grit * 0.14
+        + mood.motion * 0.10
+        + min(1.0, scene_age / 1.4) * 0.18
+    )
+    if scene in ("listen", "drive") and mood.space > 0.64 and mood.impact < 0.42:
+        intensity *= 0.52
+    index = min(len(deck) - 1, int(intensity * len(deck)))
+    return deck[index]
+
+
 def _alternate_key(scene: str, key: str, mood: MusicMood | None) -> str:
     if mood is not None:
-        key = PROFILE_ALTERNATES.get(mood.profile, {}).get(key, key)
-        return key
+        deck = _profile_deck(scene, mood)
+        if deck:
+            if key not in deck:
+                return deck[0]
+            index = deck.index(key)
+            return deck[(index + 1) % len(deck)]
     alternatives = {
         "drive": {"3": "4", "4": "6"},
         "fault": {"7": "6", "6": "4"},
@@ -458,6 +478,12 @@ def _alternate_key(scene: str, key: str, mood: MusicMood | None) -> str:
         "chaos": {"1": "8", "8": "9", "9": "2"},
     }
     return alternatives.get(scene, {}).get(key, key)
+
+
+def _profile_deck(scene: str, mood: MusicMood | None) -> tuple[str, ...]:
+    if mood is None:
+        return ()
+    return PROFILE_EFFECT_DECKS.get(mood.profile, {}).get(scene, ())
 
 
 def _mood_debounce_scale(mood: MusicMood) -> float:

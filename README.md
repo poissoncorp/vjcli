@@ -223,6 +223,10 @@ push pressure faster, and let waves hit thicker. The same kick can still punch,
 but the surrounding track decides whether that punch becomes haze, chroma,
 blackout, or full collapse.
 
+Auto effects are chosen from short profile decks instead of one global mapping.
+That lets a sustained hard section rotate through rupture tools while a sparse
+or spectral section can keep the same analyzer hit restrained.
+
 The mode is opt-in. Without `--lsd`, `vjctl` stays in the original red/black
 warehouse palette.
 
@@ -238,8 +242,8 @@ vjctl --music demo --meter
 Columns include scene, scene age, latest automatic effect, audio features,
 beat/phase estimates, clock phase, timing confidence, trigger decisions,
 pressure, trigger score, transition hit strength, aftershock strength,
-beat accent, aggression, density, LSD profile, LSD confidence, LSD margin, and
-LSD shift.
+beat accent, aggression, density, LSD profile, LSD confidence, LSD certainty,
+LSD margin, and LSD shift.
 
 For an in-scene readout, run:
 
@@ -250,8 +254,9 @@ vjctl --debug
 The debug overlay shows analyzer features, beat hints, clock state, scene, scene
 age, pressure, trigger score, model aggression/density, wave count, the latest
 beat accent, transition hit, aftershock strength, automatic effect, and active
-hold effects. With `--lsd`, it also shows the selected profile, confidence, and
-profile margin. Stable profile changes also create a short LSD shift hit.
+hold effects. With `--lsd`, it also shows the selected profile, confidence,
+certainty, profile margin, and motif. Stable profile changes also create a short
+LSD shift hit.
 
 ## Controls
 
