@@ -8,6 +8,7 @@ from .music import MusicFrame
 
 class AudioAnalyzer:
     def __init__(self) -> None:
+        self.level = 0.08
         self.energy = 0.0
         self.bass = 0.0
         self.brightness = 0.0
@@ -15,6 +16,7 @@ class AudioAnalyzer:
     def read(self, samples: Sequence[float], sample_rate: int) -> MusicFrame:
         if not samples or sample_rate <= 0:
             return MusicFrame()
+        samples = self._normalize(samples)
         energy = _clamp(_rms(samples) * 1.9)
         bass = _clamp(_band(samples, sample_rate, (46.0, 58.0, 73.0, 92.0, 116.0)) * 1.35)
         middle = _clamp(_band(samples, sample_rate, (180.0, 260.0, 390.0, 620.0)) * 1.45)
@@ -39,6 +41,14 @@ class AudioAnalyzer:
             change=change,
             confidence=confidence,
         )
+
+    def _normalize(self, samples: Sequence[float]) -> list[float]:
+        peak = max(abs(sample) for sample in samples)
+        target = max(0.08, peak)
+        amount = 0.72 if target > self.level else 0.28
+        self.level = _follow(self.level, target, amount)
+        gain = min(9.5, 0.76 / max(0.08, self.level))
+        return [_clip_sample(sample * gain) for sample in samples]
 
 
 def _rms(samples: Sequence[float]) -> float:
@@ -66,6 +76,10 @@ def _tone(samples: Sequence[float], sample_rate: int, frequency: float) -> float
 
 def _follow(current: float, target: float, amount: float) -> float:
     return current + (target - current) * amount
+
+
+def _clip_sample(value: float) -> float:
+    return max(-1.0, min(1.0, float(value)))
 
 
 def _clamp(value: float) -> float:
