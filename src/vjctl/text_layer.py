@@ -53,14 +53,18 @@ class ArtText:
         chroma = _effect_amount(model, "chroma")
         overdrive = _effect_amount(model, "overdrive")
         collapse = _effect_amount(model, "collapse")
+        music_fault = _music_fault(model)
         intensity = _text_intensity(mode)
         damage = 0.01 + model.effective_density * 0.04 + chroma * 0.12
-        damage = min(0.22, damage + overdrive * 0.15 + collapse * 0.08) * intensity
-        split = min(1.0, 0.08 + chroma * 0.76 + overdrive * 0.24 + collapse * 0.2) * intensity
+        damage = min(0.24, damage + overdrive * 0.15 + collapse * 0.08 + music_fault * 0.11)
+        split = 0.08 + chroma * 0.76 + overdrive * 0.24 + collapse * 0.2 + music_fault * 0.34
+        damage *= intensity
+        split = min(1.0, split) * intensity
         salt = round(beat_time * (4 + split * 10))
         if knockout:
             _knockout(buffer, lines, x, y)
-        _pixel_layer(buffer, lines, x - 1 - round(split * 3), y, DEEP_RED, salt + 3, split * 0.42, True)
+        left_x = x - 1 - round(split * 3)
+        _pixel_layer(buffer, lines, left_x, y, DEEP_RED, salt + 3, split * 0.42, True)
         _pixel_layer(buffer, lines, x + 1 + round(split * 4), y, RED, salt + 7, split * 0.55, True)
         _pixel_layer(buffer, lines, x + 1, y - 1, ASH, salt + 11, split * 0.28, True)
         _pixel_layer(buffer, lines, x, y, color, salt, damage, False)
@@ -122,7 +126,9 @@ class TextLayer:
         )
         if model.prompt or model.overlays or model.socials or buffer.height < 28:
             return
-        meters = f"A{round(model.effective_aggression * 100):02d} D{round(model.effective_density * 100):02d}"
+        aggr = round(model.effective_aggression * 100)
+        dens = round(model.effective_density * 100)
+        meters = f"A{aggr:02d} D{dens:02d}"
         self._plain.render(
             buffer,
             meters,
@@ -201,6 +207,13 @@ def _effect_amount(model: VJModel, effect_id: str) -> float:
     if effect is None:
         return 0.0
     return max(effect.charge, effect.release)
+
+
+def _music_fault(model: VJModel) -> float:
+    frame = model.music
+    if frame.confidence < 0.08:
+        return 0.0
+    return min(1.0, frame.brightness * 0.52 + frame.change * 0.5 + frame.onset * 0.18)
 
 
 def _row_shear(row: int, salt: int, amount: float) -> int:

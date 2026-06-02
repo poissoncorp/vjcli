@@ -28,11 +28,12 @@ class EffectRenderers:
         }
 
     def background(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
-        aggr = model.effective_aggression
+        aggr = max(model.effective_aggression, model.music.energy * 0.62)
+        density = max(model.effective_density, model.music.density * 0.74)
         if model.cooldown > 0.92:
             return
-        spacing = max(8, round(18 - aggr * 8))
-        drift = int(beat_time * (3 + aggr * 9)) % spacing
+        spacing = max(6, round(18 - aggr * 7 - density * 3))
+        drift = int(beat_time * (3 + aggr * 9 + model.music.brightness * 5)) % spacing
         for y in range(2, buffer.height - 2, spacing):
             for x in range(-drift, buffer.width, 19):
                 char = "-" if (x + y) % 3 else "."
@@ -140,7 +141,8 @@ class EffectRenderers:
             for x in range(start, min(buffer.width, start + length)):
                 if x % 2 == 0 or amount > 0.72:
                     char = "_" if x % 3 else "-"
-                    buffer.write_cell(x, y, char, fg=RED if amount > 0.72 else DEEP_RED, dim=amount < 0.7)
+                    color = RED if amount > 0.72 else DEEP_RED
+                    buffer.write_cell(x, y, char, fg=color, dim=amount < 0.7)
 
     def _tunnel(
         self,
@@ -180,7 +182,8 @@ class EffectRenderers:
     ) -> None:
         if release <= 0.02:
             return
-        lines = choose_art("DROP IMPACT", max(8, buffer.width - 8), min(9, max(5, buffer.height - 4)))
+        height = min(9, max(5, buffer.height - 4))
+        lines = choose_art("DROP IMPACT", max(8, buffer.width - 8), height)
         width = max(len(line) for line in lines)
         x = max(0, (buffer.width - width) // 2)
         y = max(2, (buffer.height - len(lines)) // 2)
@@ -188,7 +191,8 @@ class EffectRenderers:
         if release <= 0.55:
             return
         buffer.write_text(0, max(0, y - 2), "-" * buffer.width, fg=RED, bold=True)
-        buffer.write_text(0, min(buffer.height - 1, y + len(lines) + 1), "-" * buffer.width, fg=RED, bold=True)
+        bottom_y = min(buffer.height - 1, y + len(lines) + 1)
+        buffer.write_text(0, bottom_y, "-" * buffer.width, fg=RED, bold=True)
         for offset in range(-5, 6):
             yy = y + len(lines) // 2 + offset
             if 0 <= yy < buffer.height and offset % 2 == 0:
@@ -202,7 +206,11 @@ class EffectRenderers:
         release: float,
         beat_time: float,
     ) -> None:
-        amount = max(charge, release)
+        music = model.music
+        music_amount = 0.0
+        if music.confidence >= 0.08:
+            music_amount = min(1.0, music.brightness * 0.42 + music.change * 0.36)
+        amount = max(charge, release, music_amount)
         if amount <= 0.01:
             return
         salt = round(beat_time * 8)
@@ -212,7 +220,9 @@ class EffectRenderers:
             shift = -2 + grain(y, salt, 11) % 5
             for x in range(0, buffer.width, 4):
                 if grain(x, y, salt) % 100 < 28 + amount * 36:
-                    buffer.write_cell(x + shift, y, "-" if x % 8 else "=", fg=ASH if shift > 0 else RED)
+                    char = "-" if x % 8 else "="
+                    color = ASH if shift > 0 else RED
+                    buffer.write_cell(x + shift, y, char, fg=color)
 
     def _quake(
         self,

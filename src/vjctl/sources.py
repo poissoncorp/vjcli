@@ -3,42 +3,49 @@ from __future__ import annotations
 import math
 import random
 
+from .analyzer import AudioAnalyzer
 from .events import SocialIncoming
 from .music import MusicFrame
 
 
 class SimulatedMusicSource:
-    def __init__(self, bpm: float = 145.0) -> None:
+    def __init__(self, bpm: float = 145.0, sample_rate: int = 16_000) -> None:
         self.bpm = bpm
-        self.pulse_index = -1
+        self.sample_rate = sample_rate
+        self.sample_index = 0
+        self.last_at: float | None = None
+        self.analyzer = AudioAnalyzer()
 
     def poll(self, now: float) -> MusicFrame:
-        beat = now * self.bpm / 60.0
+        duration = 1.0 / 60.0 if self.last_at is None else max(0.0, now - self.last_at)
+        self.last_at = now
+        count = max(1, round(min(0.1, duration) * self.sample_rate))
+        start = self.sample_index
+        self.sample_index += count
+        samples = [self._sample((start + index) / self.sample_rate) for index in range(count)]
+        return self.analyzer.read(samples, self.sample_rate)
+
+    def _sample(self, t: float) -> float:
+        beat = t * self.bpm / 60.0
         phase = beat % 1.0
-        pulse = int(beat * 4.0)
         phrase = 0.5 + math.sin(beat * math.tau / 16.0) * 0.5
-        bass = max(0.0, 1.0 - phase * 6.8)
-        hats = max(0.0, 1.0 - ((beat * 2.0 + 0.5) % 1.0) * 9.0)
-        onset = 0.0
-        change = 0.0
-        if pulse != self.pulse_index:
-            self.pulse_index = pulse
-            step = pulse % 16
-            if step in (0, 4, 8, 12):
-                onset = 0.86
-                change = 0.72 if step == 0 else 0.24
-            elif step in (2, 6, 10, 14):
-                onset = 0.42
-                change = 0.16
-        return MusicFrame(
-            energy=0.14 + bass * 0.68 + hats * 0.18 + phrase * 0.12,
-            bass=bass,
-            brightness=0.10 + hats * 0.65,
-            density=0.12 + phrase * 0.24 + bass * 0.12,
-            onset=onset,
-            change=change,
-            confidence=0.86,
-        )
+        step = int(beat * 4.0) % 16
+        kick = max(0.0, 1.0 - phase * 9.0)
+        offbeat = (beat + 0.5) % 1.0
+        hat = max(0.0, 1.0 - offbeat * 15.0)
+        bass_env = 0.16 + phrase * 0.18 + (0.22 if step in (0, 3, 7, 11) else 0.0)
+        kick_wave = math.sin(math.tau * 54.0 * t) * kick * 0.78
+        sub_wave = math.sin(math.tau * 108.0 * t) * bass_env
+        mid_wave = math.sin(math.tau * (260.0 + step * 7.0) * t) * phrase * 0.12
+        hat_wave = _noise(t) * hat * 0.32
+        return max(-1.0, min(1.0, kick_wave + sub_wave + mid_wave + hat_wave))
+
+
+def _noise(t: float) -> float:
+    a = math.sin(math.tau * 1831.0 * t)
+    b = math.sin(math.tau * 4217.0 * t + 1.7)
+    c = math.sin(math.tau * 7099.0 * t + 0.3)
+    return (a * b + c * 0.5) / 1.5
 
 
 class SimulatedSocialSource:

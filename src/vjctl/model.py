@@ -163,12 +163,14 @@ class VJModel:
     def apply_music(self, frame: MusicFrame, now: float) -> None:
         self.music = frame
         if frame.confidence < 0.08:
+            self.aggression = _follow(self.aggression, DEFAULT_AGGRESSION, 0.05)
+            self.density = _follow(self.density, DEFAULT_DENSITY, 0.05)
             return
-        self.aggression = max(DEFAULT_AGGRESSION, min(1.0, DEFAULT_AGGRESSION + frame.drive * 0.84))
-        self.density = max(DEFAULT_DENSITY, min(1.0, DEFAULT_DENSITY + frame.mass * 0.62))
+        self.aggression = _clamp(max(DEFAULT_AGGRESSION, DEFAULT_AGGRESSION + frame.drive * 0.84))
+        self.density = _clamp(max(DEFAULT_DENSITY, DEFAULT_DENSITY + frame.mass * 0.62))
         if frame.onset < 0.58 or now - self.last_music_onset_at < 0.12:
             return
-        strength = max(0.34, min(1.0, frame.onset * 0.82 + frame.bass * 0.28 + frame.change * 0.18))
+        strength = _clamp(max(0.34, frame.onset * 0.82 + frame.bass * 0.28 + frame.change * 0.18))
         self._spawn_wave(now, strength)
         self.last_music_onset_at = now
         self.status = "MUSIC ONSET"
@@ -272,4 +274,13 @@ class VJModel:
         beat_seconds = 60.0 / max(1.0, self.clock.bpm)
         lifetime_beats = max(0.82, 3.0 - aggression * 1.55)
         born_at = now + offset_beats * beat_seconds
-        self.waves.append(Wave(born_at, strength, aggression, density, lifetime_beats * beat_seconds))
+        lifetime = lifetime_beats * beat_seconds
+        self.waves.append(Wave(born_at, strength, aggression, density, lifetime))
+
+
+def _follow(current: float, target: float, amount: float) -> float:
+    return current + (target - current) * amount
+
+
+def _clamp(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
