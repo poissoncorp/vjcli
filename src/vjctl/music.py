@@ -14,6 +14,7 @@ class MusicFrame:
     change: float = 0.0
     confidence: float = 0.0
     beat_interval: float = 0.0
+    beat_phase: float = 0.0
     beat_confidence: float = 0.0
 
     def __post_init__(self) -> None:

@@ -83,12 +83,14 @@ class TempoClock:
     def slider(self, amount: float) -> None:
         self.target_bpm = _clamp_bpm(self.target_bpm + amount)
 
-    def suggest_bpm(self, bpm: float, confidence: float) -> None:
+    def suggest_audio(self, bpm: float, phase: float, confidence: float) -> None:
         if self.locked or bpm <= 0.0 or confidence < 0.68:
             return
         target = _clamp_bpm(bpm)
         amount = min(0.18, max(0.04, confidence * 0.14))
         self.target_bpm += (target - self.target_bpm) * amount
+        phase_error = _phase_error(phase, self.phase)
+        self._nudge_phase(phase_error * min(0.12, confidence * 0.08))
         self.source = TIMING_AUDIO
         self.confidence = max(self.confidence, confidence)
 
@@ -100,6 +102,11 @@ class TempoClock:
         while self.phase < 0.0:
             self.phase += 1.0
             self.beat_index -= 1
+
+    def _nudge_phase(self, amount: float) -> None:
+        phase = self.phase + amount
+        if 0.0 <= phase < 1.0:
+            self.phase = phase
 
     def free_roam(self) -> None:
         self.locked = False
@@ -113,6 +120,10 @@ class TempoClock:
 
 def _clamp_bpm(value: float) -> float:
     return max(40.0, min(220.0, float(value)))
+
+
+def _phase_error(target: float, current: float) -> float:
+    return (float(target) - float(current) + 0.5) % 1.0 - 0.5
 
 
 def _steady(intervals: list[float]) -> bool:

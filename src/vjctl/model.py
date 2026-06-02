@@ -166,7 +166,7 @@ class VJModel:
 
     def apply_music(self, frame: MusicFrame, now: float) -> None:
         self.music = frame
-        self.clock.suggest_bpm(frame.beat_bpm, frame.beat_confidence)
+        self.clock.suggest_audio(frame.beat_bpm, frame.beat_phase, frame.beat_confidence)
         reaction = self.music_reactor.react(frame, now, self.aggression, self.density)
         self.aggression = reaction.aggression
         self.density = reaction.density

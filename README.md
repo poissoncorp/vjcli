@@ -51,7 +51,8 @@ vjctl --music audio
 
 On macOS, route system/DJ audio into an input device with BlackHole or a real audio interface,
 then select it with `--audio-device` if needed.
-Meter prints audio features, beat estimate, and the model trigger/aggression/density decision.
+Meter prints audio features, beat/phase estimates, and the model trigger/aggression/density
+decision.
 Confident audio beat estimates gently steer the free clock without locking or restarting it.
 
 Or run from the repo without installing:

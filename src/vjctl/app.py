@@ -18,6 +18,11 @@ from .music_reactor import MusicReactor, MusicTuning
 from .renderer import Renderer
 from .sources import SimulatedMusicSource, SimulatedSocialSource
 
+METER_HEADER = (
+    "frame energy bass high dens onset change conf "
+    "bpm bphase bconf clock phase tconf trig aggr mdens\n"
+)
+
 
 class TerminalSession:
     def __init__(self) -> None:
@@ -149,9 +154,7 @@ def run_meter(
     model = _model(music_tuning)
     interval = 1.0 / max(1, fps)
     next_at = time.monotonic()
-    sys.stdout.write(
-        "frame energy bass high dens onset change conf bpm bconf clock tconf trig aggr mdens\n"
-    )
+    sys.stdout.write(METER_HEADER)
     try:
         for index in range(max(0, frames)):
             now = time.monotonic()
@@ -207,8 +210,10 @@ def _meter_line(index: int, frame: MusicFrame, model: VJModel, hit: bool) -> str
         frame.change,
         frame.confidence,
         frame.beat_bpm,
+        frame.beat_phase,
         frame.beat_confidence,
         timing.target_bpm,
+        timing.phase,
         timing.confidence,
         1.0 if hit else 0.0,
         model.effective_aggression,

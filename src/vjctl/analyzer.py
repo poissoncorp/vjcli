@@ -15,6 +15,7 @@ class AudioAnalyzer:
         self.brightness = 0.0
         self.last_beat_at: float | None = None
         self.beat_interval = 0.0
+        self.beat_phase = 0.0
         self.beat_confidence = 0.0
 
     def read(self, samples: Sequence[float], sample_rate: int) -> MusicFrame:
@@ -35,6 +36,7 @@ class AudioAnalyzer:
         change = _clamp(energy_rise * 2.2 + bass_rise * 1.4 + color_shift * 0.72)
         confidence = _clamp(energy * 1.7 + max(bass, middle, high) * 0.6)
         self._track_beat(onset, confidence)
+        self._track_phase()
         self.energy = _follow(self.energy, energy, 0.34)
         self.bass = _follow(self.bass, bass, 0.38)
         self.brightness = _follow(self.brightness, brightness, 0.28)
@@ -47,6 +49,7 @@ class AudioAnalyzer:
             change=change,
             confidence=confidence,
             beat_interval=self.beat_interval,
+            beat_phase=self.beat_phase,
             beat_confidence=self.beat_confidence,
         )
 
@@ -67,7 +70,7 @@ class AudioAnalyzer:
             self.beat_confidence = max(self.beat_confidence, onset * 0.28)
             return
         interval = self.time - self.last_beat_at
-        if interval < 0.34:
+        if interval < 0.30:
             self.beat_confidence *= 0.9
             return
         self.last_beat_at = self.time
@@ -85,6 +88,12 @@ class AudioAnalyzer:
             amount,
         )
         self.beat_confidence = _clamp(onset * 0.38 + confidence * 0.2 + stability * 0.42)
+
+    def _track_phase(self) -> None:
+        if self.last_beat_at is None or self.beat_interval <= 0.0:
+            self.beat_phase = 0.0
+            return
+        self.beat_phase = ((self.time - self.last_beat_at) / self.beat_interval) % 1.0
 
 
 def _rms(samples: Sequence[float]) -> float:
