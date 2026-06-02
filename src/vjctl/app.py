@@ -19,7 +19,7 @@ from .renderer import Renderer
 from .sources import SimulatedMusicSource, SimulatedSocialSource
 
 METER_HEADER = (
-    "frame scene energy bass high dens onset change conf "
+    "frame scene sage auto energy bass high dens onset change conf "
     "bpm bphase bconf clock phase tconf trig pressure score aggr mdens\n"
 )
 
@@ -223,7 +223,12 @@ def _meter_line(index: int, frame: MusicFrame, model: VJModel, hit: bool) -> str
         model.effective_aggression,
         model.effective_density,
     )
-    fields = [f"{index:05d}", model.auto_scene]
+    fields = [
+        f"{index:05d}",
+        model.auto_scene,
+        f"{model.auto_scene_age:.3f}",
+        model.last_auto_effect,
+    ]
     fields.extend(f"{value:.3f}" for value in values)
     return " ".join(fields) + "\n"
 

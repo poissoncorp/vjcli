@@ -167,6 +167,9 @@ over time, classifies the current moment, and uses that scene to choose effects:
 - `chaos` combines rails, slips, cuts, and can trigger `1` overdrive or `8` quake
 - clean hits can still fall back to `4` impact
 
+The director tracks scene age and avoids repeating the same automatic effect
+back-to-back, so a sustained section can escalate instead of looping one hit.
+
 `0` stays manual. It is the operator's free-roam reset, not an automatic music
 decision.
 
@@ -179,8 +182,9 @@ vjctl --meter
 vjctl --music demo --meter
 ```
 
-Columns include scene, audio features, beat/phase estimates, clock phase, timing
-confidence, trigger decisions, pressure, trigger score, aggression, and density.
+Columns include scene, scene age, latest automatic effect, audio features,
+beat/phase estimates, clock phase, timing confidence, trigger decisions,
+pressure, trigger score, aggression, and density.
 
 For an in-scene readout, run:
 
@@ -188,8 +192,8 @@ For an in-scene readout, run:
 vjctl --debug
 ```
 
-The debug overlay shows analyzer features, beat hints, clock state, scene,
-pressure, trigger score, model aggression/density, wave count, the latest
+The debug overlay shows analyzer features, beat hints, clock state, scene, scene
+age, pressure, trigger score, model aggression/density, wave count, the latest
 automatic effect, and active hold effects.
 
 ## Controls

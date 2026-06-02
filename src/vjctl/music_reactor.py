@@ -24,6 +24,7 @@ class MusicReaction:
     wave_strength: float | None = None
     effect_key: str | None = None
     scene: str = "idle"
+    scene_age: float = 0.0
     pressure: float = 0.0
     trigger_score: float = 0.0
     status: str | None = None
@@ -35,6 +36,10 @@ class MusicReactor:
     last_onset_at: float = -999.0
     last_effect_at: float = -999.0
     last_frame_at: float = -999.0
+    scene_started_at: float = -999.0
+    last_scene: str = "idle"
+    last_effect_key: str | None = None
+    effect_repeat: int = 0
     frames_seen: int = 0
     pressure: float = 0.0
 
@@ -53,26 +58,40 @@ class MusicReactor:
                 _follow(aggression, DEFAULT_AGGRESSION, 0.05),
                 _follow(density, DEFAULT_DENSITY, 0.05),
                 scene="idle",
+                scene_age=self._set_scene("idle", now),
                 pressure=self.pressure,
             )
 
         self.frames_seen += 1
         self._update_pressure(frame, dt)
         scene = _scene(frame, self.pressure)
+        scene_age = self._set_scene(scene, now)
+        scene_entered = scene_age == 0.0
         score = _trigger_score(frame, self.pressure)
         next_aggression = _clamp(
-            max(DEFAULT_AGGRESSION, DEFAULT_AGGRESSION + frame.drive * 0.62 + self.pressure * 0.28)
+            max(
+                DEFAULT_AGGRESSION,
+                DEFAULT_AGGRESSION + frame.drive * 0.62 + self.pressure * 0.28,
+            )
         )
         next_density = _clamp(
-            max(DEFAULT_DENSITY, DEFAULT_DENSITY + frame.mass * 0.50 + self.pressure * 0.20)
+            max(
+                DEFAULT_DENSITY,
+                DEFAULT_DENSITY + frame.mass * 0.50 + self.pressure * 0.20,
+            )
         )
-        effect_key = self._effect_key(frame, now, scene, score) if self.frames_seen > 1 else None
+        effect_key = (
+            self._effect_key(frame, now, scene, scene_age, scene_entered, score)
+            if self.frames_seen > 1
+            else None
+        )
         if frame.onset < self.tuning.onset_threshold:
             return MusicReaction(
                 next_aggression,
                 next_density,
                 effect_key=effect_key,
                 scene=scene,
+                scene_age=scene_age,
                 pressure=self.pressure,
                 trigger_score=score,
             )
@@ -82,6 +101,7 @@ class MusicReactor:
                 next_density,
                 effect_key=effect_key,
                 scene=scene,
+                scene_age=scene_age,
                 pressure=self.pressure,
                 trigger_score=score,
             )
@@ -96,10 +116,20 @@ class MusicReactor:
             wave_strength=strength,
             effect_key=effect_key,
             scene=scene,
+            scene_age=scene_age,
             pressure=self.pressure,
             trigger_score=score,
             status=f"MUSIC {scene.upper()}",
         )
+
+    def _set_scene(self, scene: str, now: float) -> float:
+        if scene != self.last_scene:
+            self.last_scene = scene
+            self.scene_started_at = now
+            return 0.0
+        if self.scene_started_at < 0.0:
+            self.scene_started_at = now
+        return max(0.0, now - self.scene_started_at)
 
     def _frame_dt(self, now: float) -> float:
         if self.last_frame_at < 0.0:
@@ -116,27 +146,73 @@ class MusicReactor:
         speed = 7.0 if target > self.pressure else 1.2
         self.pressure = _follow(self.pressure, target, _attack(dt, speed))
 
-    def _effect_key(self, frame: MusicFrame, now: float, scene: str, score: float) -> str | None:
-        if now - self.last_effect_at < self.tuning.effect_debounce:
+    def _effect_key(
+        self,
+        frame: MusicFrame,
+        now: float,
+        scene: str,
+        scene_age: float,
+        scene_entered: bool,
+        score: float,
+    ) -> str | None:
+        debounce = self.tuning.effect_debounce
+        if scene_entered:
+            debounce *= 0.45
+        if now - self.last_effect_at < debounce:
             return None
-        if score < self.tuning.effect_threshold:
+        threshold = self.tuning.effect_threshold
+        if scene_entered or scene_age < 0.35:
+            threshold = max(0.0, threshold - 0.08)
+        if score < threshold:
             return None
         self.last_effect_at = now
-        if scene == "chaos" and frame.drive > 0.78 and frame.mass > 0.58:
-            return "1"
-        if scene == "rupture" and self.pressure > 0.62:
-            return "2"
-        if scene == "rupture":
-            return "9"
-        if scene == "chaos":
-            return "8"
-        if scene == "fault":
-            return "7"
-        if scene == "weight":
-            return "5"
-        if scene == "drive":
-            return "3"
-        return "4"
+        key = _candidate_key(frame, scene, scene_age, self.pressure)
+        key = self._avoid_repeat(key, scene)
+        self._remember_effect(key)
+        return key
+
+    def _avoid_repeat(self, key: str, scene: str) -> str:
+        if key != self.last_effect_key or self.effect_repeat < 1:
+            return key
+        return _alternate_key(scene, key)
+
+    def _remember_effect(self, key: str) -> None:
+        if key == self.last_effect_key:
+            self.effect_repeat += 1
+            return
+        self.last_effect_key = key
+        self.effect_repeat = 0
+
+
+def _candidate_key(frame: MusicFrame, scene: str, scene_age: float, pressure: float) -> str:
+    if scene == "chaos" and frame.drive > 0.78 and frame.mass > 0.58:
+        return "1"
+    if scene == "rupture" and pressure > 0.68 and scene_age < 0.90:
+        return "2"
+    if scene == "rupture" and pressure > 0.62:
+        return "1"
+    if scene == "rupture":
+        return "9"
+    if scene == "chaos":
+        return "8"
+    if scene == "fault":
+        return "7"
+    if scene == "weight":
+        return "5"
+    if scene == "drive":
+        return "3"
+    return "4"
+
+
+def _alternate_key(scene: str, key: str) -> str:
+    alternatives = {
+        "drive": {"3": "4", "4": "6"},
+        "fault": {"7": "6", "6": "4"},
+        "weight": {"5": "8", "8": "3"},
+        "rupture": {"9": "2", "2": "9", "1": "9"},
+        "chaos": {"1": "8", "8": "9", "9": "2"},
+    }
+    return alternatives.get(scene, {}).get(key, key)
 
 
 def _follow(current: float, target: float, amount: float) -> float:

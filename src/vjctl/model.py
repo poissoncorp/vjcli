@@ -83,6 +83,7 @@ class VJModel:
     cooldown: float = 0.0
     status: str = "vjctl realm"
     auto_scene: str = "idle"
+    auto_scene_age: float = 0.0
     auto_pressure: float = 0.0
     auto_score: float = 0.0
     last_auto_effect: str = "-"
@@ -177,6 +178,7 @@ class VJModel:
         self.aggression = reaction.aggression
         self.density = reaction.density
         self.auto_scene = reaction.scene
+        self.auto_scene_age = reaction.scene_age
         self.auto_pressure = reaction.pressure
         self.auto_score = reaction.trigger_score
         if reaction.wave_strength is not None:
