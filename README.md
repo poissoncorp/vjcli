@@ -217,6 +217,12 @@ spark, space, climate motion, and certainty. Renderers and AutoVJ decisions use
 those values instead of re-interpreting raw audio, so the visual system can keep
 getting smarter without coupling every effect to the analyzer.
 
+Profiles also carry an AutoVJ budget. Softer profiles raise effect thresholds,
+stretch debounce, and reduce transition force. Harder profiles lower the gate,
+push pressure faster, and let waves hit thicker. The same kick can still punch,
+but the surrounding track decides whether that punch becomes haze, chroma,
+blackout, or full collapse.
+
 The mode is opt-in. Without `--lsd`, `vjctl` stays in the original red/black
 warehouse palette.
 

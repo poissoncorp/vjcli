@@ -77,6 +77,76 @@ PROFILE_ALTERNATES = {
 
 
 @dataclass(frozen=True)
+class ProfileBias:
+    pressure: float = 1.0
+    aggression: float = 1.0
+    density: float = 1.0
+    threshold: float = 0.0
+    debounce: float = 1.0
+    wave: float = 1.0
+    transition: float = 1.0
+
+
+PROFILE_BIASES = {
+    "velvet": ProfileBias(
+        pressure=0.72,
+        aggression=0.78,
+        density=0.86,
+        threshold=0.10,
+        debounce=1.22,
+        wave=0.82,
+        transition=0.72,
+    ),
+    "house": ProfileBias(
+        pressure=0.92,
+        aggression=0.90,
+        density=0.92,
+        threshold=0.02,
+        debounce=1.08,
+        wave=0.96,
+        transition=0.86,
+    ),
+    "acid": ProfileBias(
+        pressure=1.02,
+        aggression=1.04,
+        density=1.04,
+        threshold=-0.03,
+        debounce=0.92,
+        wave=0.98,
+        transition=0.98,
+    ),
+    "spectral": ProfileBias(
+        pressure=0.68,
+        aggression=0.74,
+        density=0.80,
+        threshold=0.12,
+        debounce=1.28,
+        wave=0.76,
+        transition=0.68,
+    ),
+    "industrial": ProfileBias(
+        pressure=1.12,
+        aggression=1.10,
+        density=1.14,
+        threshold=-0.05,
+        debounce=0.86,
+        wave=1.08,
+        transition=1.10,
+    ),
+    "hard": ProfileBias(
+        pressure=1.22,
+        aggression=1.18,
+        density=1.18,
+        threshold=-0.07,
+        debounce=0.80,
+        wave=1.14,
+        transition=1.18,
+    ),
+}
+DEFAULT_PROFILE_BIAS = ProfileBias()
+
+
+@dataclass(frozen=True)
 class MusicMood:
     profile: str
     confidence: float
@@ -147,30 +217,34 @@ class MusicReactor:
 
         self.frames_seen += 1
         response = _tempo_response(frame)
-        self._update_pressure(frame, dt, response)
+        self._update_pressure(frame, dt, response, mood)
         scene = self._stabilized_scene(_scene(frame, self.pressure, response, mood), frame, now)
         scene_age = self._set_scene(scene, now)
         scene_entered = scene_age == 0.0
         score = _trigger_score(frame, self.pressure, response)
         transition_strength = (
-            _transition_strength(frame, scene, self.pressure, response)
+            _transition_strength(frame, scene, self.pressure, response, mood)
             if scene_entered and self.frames_seen > 1
             else None
+        )
+        aggression_lift = (
+            frame.drive * (0.34 + response * 0.28)
+            + self.pressure * (0.14 + response * 0.14)
+        )
+        density_lift = (
+            frame.mass * (0.30 + response * 0.20)
+            + self.pressure * (0.10 + response * 0.10)
         )
         next_aggression = _clamp(
             max(
                 DEFAULT_AGGRESSION,
-                DEFAULT_AGGRESSION
-                + frame.drive * (0.34 + response * 0.28)
-                + self.pressure * (0.14 + response * 0.14),
+                DEFAULT_AGGRESSION + aggression_lift * _mood_scale(mood, "aggression"),
             )
         )
         next_density = _clamp(
             max(
                 DEFAULT_DENSITY,
-                DEFAULT_DENSITY
-                + frame.mass * (0.30 + response * 0.20)
-                + self.pressure * (0.10 + response * 0.10),
+                DEFAULT_DENSITY + density_lift * _mood_scale(mood, "density"),
             )
         )
         effect_key = (
@@ -211,7 +285,7 @@ class MusicReactor:
                 trigger_score=score,
             )
 
-        strength = _wave_strength(frame, response)
+        strength = _wave_strength(frame, response, mood)
         self.last_onset_at = now
         return MusicReaction(
             next_aggression,
@@ -256,7 +330,13 @@ class MusicReactor:
         self.last_frame_at = now
         return dt
 
-    def _update_pressure(self, frame: MusicFrame, dt: float, response: float) -> None:
+    def _update_pressure(
+        self,
+        frame: MusicFrame,
+        dt: float,
+        response: float,
+        mood: MusicMood | None,
+    ) -> None:
         target = _clamp(
             frame.drive * 0.32
             + frame.mass * 0.22
@@ -264,6 +344,7 @@ class MusicReactor:
             + frame.onset * 0.10
         )
         target *= 0.56 + response * 0.44
+        target *= _mood_scale(mood, "pressure")
         speed = (3.4 + response * 3.6) if target > self.pressure else 1.2
         self.pressure = _follow(self.pressure, target, _attack(dt, speed))
 
@@ -281,6 +362,7 @@ class MusicReactor:
         debounce = self.tuning.effect_debounce + (1.0 - response) * 0.46
         if mood is not None:
             debounce *= _mood_debounce_scale(mood)
+            debounce *= _mood_scale(mood, "debounce")
         if scene_entered:
             debounce *= 0.62
         if now - self.last_effect_at < debounce:
@@ -288,6 +370,7 @@ class MusicReactor:
         threshold = self.tuning.effect_threshold + (1.0 - response) * 0.18
         if mood is not None:
             threshold += _mood_threshold_shift(mood, scene)
+            threshold += _mood_add(mood, "threshold")
         if scene_entered or scene_age < 0.35:
             threshold = max(0.0, threshold - 0.05 * response)
         if score < threshold:
@@ -403,11 +486,24 @@ def _mood_certainty(mood: MusicMood) -> float:
     return _clamp(mood.certainty)
 
 
+def _mood_scale(mood: MusicMood | None, field: str) -> float:
+    if mood is None:
+        return 1.0
+    target = getattr(PROFILE_BIASES.get(mood.profile, DEFAULT_PROFILE_BIAS), field)
+    return _blend(1.0, target, _mood_certainty(mood))
+
+
+def _mood_add(mood: MusicMood, field: str) -> float:
+    target = getattr(PROFILE_BIASES.get(mood.profile, DEFAULT_PROFILE_BIAS), field)
+    return target * _mood_certainty(mood)
+
+
 def _transition_strength(
     frame: MusicFrame,
     scene: str,
     pressure: float,
     response: float,
+    mood: MusicMood | None,
 ) -> float | None:
     if scene in ("idle", "listen"):
         return None
@@ -422,6 +518,7 @@ def _transition_strength(
         return None
     strength = base + pressure * 0.16 + frame.change * 0.10 + frame.bass * 0.06
     strength *= 0.58 + response * 0.42
+    strength *= _mood_scale(mood, "transition")
     return _clamp(strength)
 
 
@@ -431,6 +528,10 @@ def _follow(current: float, target: float, amount: float) -> float:
 
 def _attack(dt: float, speed: float) -> float:
     return max(0.0, min(1.0, dt * speed))
+
+
+def _blend(current: float, target: float, amount: float) -> float:
+    return current + (target - current) * amount
 
 
 def _scene(
@@ -502,10 +603,11 @@ def _trigger_score(frame: MusicFrame, pressure: float, response: float) -> float
     )
 
 
-def _wave_strength(frame: MusicFrame, response: float) -> float:
+def _wave_strength(frame: MusicFrame, response: float, mood: MusicMood | None) -> float:
     raw = frame.onset * 0.66 + frame.bass * 0.22 + frame.change * 0.12
     floor = 0.24 + response * 0.10
-    return _clamp(max(floor, raw * (0.56 + response * 0.44)))
+    strength = max(floor, raw * (0.56 + response * 0.44))
+    return _clamp(strength * _mood_scale(mood, "wave"))
 
 
 def _tempo_response(frame: MusicFrame) -> float:
