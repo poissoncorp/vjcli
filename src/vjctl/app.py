@@ -133,13 +133,18 @@ def run_meter(
         return 2
     if source is None:
         return 2
+    model = VJModel()
     interval = 1.0 / max(1, fps)
     next_at = time.monotonic()
-    sys.stdout.write("frame energy bass high dens onset change conf\n")
+    sys.stdout.write("frame energy bass high dens onset change conf trig aggr mdens\n")
     try:
         for index in range(max(0, frames)):
-            frame = source.poll(time.monotonic()) or MusicFrame()
-            sys.stdout.write(_meter_line(index, frame))
+            now = time.monotonic()
+            frame = source.poll(now) or MusicFrame()
+            wave_count = len(model.waves)
+            model.apply_music(frame, now)
+            hit = len(model.waves) > wave_count
+            sys.stdout.write(_meter_line(index, frame, model, hit))
             sys.stdout.flush()
             next_at += interval
             delay = next_at - time.monotonic()
@@ -172,7 +177,7 @@ def _poll_music(model: VJModel, source: MusicSource | None, now: float) -> None:
         model.apply_music(frame, now)
 
 
-def _meter_line(index: int, frame: MusicFrame) -> str:
+def _meter_line(index: int, frame: MusicFrame, model: VJModel, hit: bool) -> str:
     values = (
         frame.energy,
         frame.bass,
@@ -181,6 +186,9 @@ def _meter_line(index: int, frame: MusicFrame) -> str:
         frame.onset,
         frame.change,
         frame.confidence,
+        1.0 if hit else 0.0,
+        model.effective_aggression,
+        model.effective_density,
     )
     return f"{index:05d} " + " ".join(f"{value:.3f}" for value in values) + "\n"
 
