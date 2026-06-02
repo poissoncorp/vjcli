@@ -8,6 +8,16 @@ from .timing import TimingState
 
 
 @dataclass(frozen=True)
+class LsdCharacter:
+    pace: float = 0.0
+    impact: float = 0.0
+    weight: float = 0.0
+    grit: float = 0.0
+    spark: float = 0.0
+    space: float = 0.0
+
+
+@dataclass(frozen=True)
 class LsdTheme:
     profile: str
     confidence: float
@@ -22,6 +32,7 @@ class LsdTheme:
     haze: float = 0.0
     margin: float = 0.0
     motif: str = "red"
+    character: LsdCharacter = field(default_factory=LsdCharacter)
 
 
 DEFAULT_THEME = LsdTheme(
@@ -149,8 +160,26 @@ class LsdDirector:
         name = _select_profile(self.scores, self.theme)
         margin = _margin(self.scores, name)
         confidence = _confidence(self.scores[name], margin, frame.confidence)
-        self.theme = _with_confidence(PROFILES[name], confidence, margin)
+        self.theme = _with_confidence(
+            PROFILES[name],
+            confidence,
+            margin,
+            _character(frame, timing),
+        )
         return self.theme
+
+
+def _character(frame: MusicFrame, timing: TimingState) -> LsdCharacter:
+    tempo = _tempo_amount(frame.beat_bpm or timing.target_bpm)
+    calm = 1.0 - frame.drive
+    steady = max(timing.confidence, frame.beat_confidence)
+    impact = _clamp(frame.onset * 0.46 + frame.bass * 0.34 + frame.drive * 0.20)
+    weight = _clamp(frame.mass * 0.52 + frame.bass * 0.38 + frame.drive * 0.16)
+    grit = _clamp(frame.density * 0.44 + frame.change * 0.34 + frame.drive * 0.22)
+    spark = _clamp(frame.brightness * 0.56 + frame.change * 0.36 + frame.onset * 0.12)
+    space = _clamp(calm * 0.46 + frame.brightness * 0.34 + (1.0 - frame.mass) * 0.20)
+    pace = _clamp(tempo * 0.50 + steady * 0.20 + frame.change * 0.18 + frame.onset * 0.12)
+    return LsdCharacter(pace, impact, weight, grit, spark, space)
 
 
 def _scores(frame: MusicFrame, timing: TimingState) -> dict[str, float]:
@@ -198,7 +227,12 @@ def _confidence(score: float, margin: float, frame_confidence: float) -> float:
     return _clamp(score * frame_confidence * certainty)
 
 
-def _with_confidence(theme: LsdTheme, confidence: float, margin: float = 0.0) -> LsdTheme:
+def _with_confidence(
+    theme: LsdTheme,
+    confidence: float,
+    margin: float = 0.0,
+    character: LsdCharacter | None = None,
+) -> LsdTheme:
     return LsdTheme(
         profile=theme.profile,
         confidence=_clamp(confidence),
@@ -213,6 +247,7 @@ def _with_confidence(theme: LsdTheme, confidence: float, margin: float = 0.0) ->
         kick_gain=theme.kick_gain,
         haze=theme.haze,
         motif=theme.motif,
+        character=character or theme.character,
     )
 
 

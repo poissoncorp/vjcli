@@ -168,7 +168,7 @@ The model uses those values in two ways:
   manual lock.
 - `LsdDirector` classifies the musical climate when `--lsd` is enabled and
   chooses the color, speed, line weight, kick impact, haze, profile motion
-  motif, and AutoVJ effect bias.
+  motif, compact character values, and AutoVJ effect bias.
 
 That means audio can guide the free clock, but four steady manual taps still win.
 Releasing effects or resetting to free roam does not restart the underlying loop
@@ -209,6 +209,11 @@ the visual climate, motion grammar, and bias automatic effect selection:
 - `spectral` opens up cold, sparse, melodic space
 - `industrial` adds grit, heavier line pressure, quake, and blackout bias
 - `hard` makes fast, dense, high-drive sections favor overdrive and blackout
+
+Each profile also carries live character values for pace, impact, weight, grit,
+spark, and space. Renderers use those values instead of re-interpreting raw
+audio, so the visual system can keep getting smarter without coupling every
+effect to the analyzer.
 
 The mode is opt-in. Without `--lsd`, `vjctl` stays in the original red/black
 warehouse palette.

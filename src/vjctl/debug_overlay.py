@@ -71,11 +71,14 @@ def _lsd(model: VJModel) -> str:
     if not model.lsd:
         return "OFF"
     theme = model.visual_theme
+    character = theme.character
     if theme.confidence <= 0.0:
         return "WAIT"
     return (
         f"{theme.profile.upper()} C{theme.confidence:.2f} "
-        f"M{theme.margin:.2f} {theme.motif.upper()} S{model.lsd_shift:.2f}"
+        f"M{theme.margin:.2f} {theme.motif.upper()} "
+        f"P{character.pace:.1f} I{character.impact:.1f} "
+        f"G{character.grit:.1f} S{model.lsd_shift:.2f}"
     )
 
 

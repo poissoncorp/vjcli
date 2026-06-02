@@ -38,10 +38,11 @@ class LsdMotifRenderer:
         amount: float,
     ) -> None:
         theme = model.visual_theme
-        salt = round(beat_time * (1.0 + model.music.brightness * 2.2) * theme.speed_gain)
+        character = theme.character
+        salt = round(beat_time * (1.0 + character.pace * 3.0) * theme.speed_gain)
         step_x = max(9, round(18 - amount * 5))
         step_y = max(3, round(7 - amount * 2))
-        threshold = 5 + amount * 18 + theme.haze * 10
+        threshold = 5 + amount * 14 + theme.haze * 10 + character.space * 10
         for y in range(3, buffer.height - 3, step_y):
             drift = (salt + y * 3) % step_x
             for x in range(-drift, buffer.width, step_x):
@@ -60,8 +61,9 @@ class LsdMotifRenderer:
         amount: float,
     ) -> None:
         theme = model.visual_theme
-        beat = max(model.beat_accent, model.music.onset * 0.72)
-        pulse = min(1.0, amount + beat * 0.46 + model.music.bass * 0.18)
+        character = theme.character
+        beat = max(model.beat_accent, character.impact * 0.72)
+        pulse = min(1.0, amount + beat * 0.46 + character.weight * 0.18)
         salt = round(beat_time * (4 + pulse * 4) * theme.speed_gain)
         center = buffer.width // 2
         span = round(buffer.width * (0.10 + pulse * 0.26))
@@ -88,7 +90,8 @@ class LsdMotifRenderer:
         amount: float,
     ) -> None:
         theme = model.visual_theme
-        spark = min(1.0, amount + model.music.brightness * 0.38 + model.music.change * 0.32)
+        character = theme.character
+        spark = min(1.0, amount + character.spark * 0.46 + character.grit * 0.18)
         salt = round(beat_time * (7 + spark * 8) * theme.speed_gain)
         step = max(3, round(10 - spark * 5))
         threshold = 4 + spark * 24
@@ -112,7 +115,8 @@ class LsdMotifRenderer:
         amount: float,
     ) -> None:
         theme = model.visual_theme
-        ghost = min(1.0, amount + model.music.brightness * 0.30)
+        character = theme.character
+        ghost = min(1.0, amount + character.space * 0.32 + character.spark * 0.14)
         salt = round(beat_time * (1.4 + ghost * 3.0) * theme.speed_gain)
         columns = 4 + round(ghost * 8)
         span = max(5, buffer.width // max(1, columns + 1))
@@ -136,7 +140,8 @@ class LsdMotifRenderer:
         amount: float,
     ) -> None:
         theme = model.visual_theme
-        weight = min(1.0, amount + model.music.bass * 0.38 + model.music.mass * 0.34)
+        character = theme.character
+        weight = min(1.0, amount + character.weight * 0.54 + character.grit * 0.18)
         salt = round(beat_time * (2.5 + weight * 4.0) * theme.speed_gain)
         columns = 5 + round(weight * 10)
         span = max(5, buffer.width // columns)
@@ -162,8 +167,9 @@ class LsdMotifRenderer:
         amount: float,
     ) -> None:
         theme = model.visual_theme
-        hit = max(model.auto_hit, model.beat_accent * theme.kick_gain, model.music.onset)
-        strike = min(1.0, amount + hit * 0.62 + model.music.drive * 0.22)
+        character = theme.character
+        hit = max(model.auto_hit, model.beat_accent * theme.kick_gain, character.impact)
+        strike = min(1.0, amount + hit * 0.62 + character.grit * 0.22)
         if strike < 0.14:
             return
         salt = round(beat_time * (6 + strike * 9) * theme.speed_gain)
@@ -187,8 +193,8 @@ class LsdMotifRenderer:
 
 def _amount(model: VJModel) -> float:
     theme = model.visual_theme
-    frame = model.music
-    pressure = max(model.auto_pressure, model.auto_hit, frame.energy * 0.22)
+    character = theme.character
+    pressure = max(model.auto_pressure, model.auto_hit, character.impact * 0.26)
     amount = theme.confidence * 0.46 + pressure * 0.38 + model.beat_accent * 0.22
     amount *= 0.74 + theme.line_gain * 0.26
     return max(0.0, min(1.0, amount))

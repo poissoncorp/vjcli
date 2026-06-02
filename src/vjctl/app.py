@@ -19,9 +19,10 @@ from .renderer import Renderer
 from .sources import SimulatedMusicSource, SimulatedSocialSource
 
 METER_HEADER = (
-    "frame scene sage auto lsd lconf lmargin lshift energy bass high dens "
-    "onset change conf bpm bphase bconf clock phase tconf trig pressure "
-    "score thit ahit baccent aggr mdens\n"
+    "frame scene sage auto lsd lmotif lconf lmargin lshift lpace limpact "
+    "lweight lgrit lspark lspace energy bass high dens onset change conf "
+    "bpm bphase bconf clock phase tconf trig pressure score thit ahit "
+    "baccent aggr mdens\n"
 )
 
 
@@ -219,7 +220,15 @@ def _poll_music(model: VJModel, source: MusicSource | None, now: float) -> None:
 
 def _meter_line(index: int, frame: MusicFrame, model: VJModel, hit: bool) -> str:
     timing = model.timing
+    theme = model.visual_theme
+    character = theme.character
     values = (
+        character.pace if model.lsd else 0.0,
+        character.impact if model.lsd else 0.0,
+        character.weight if model.lsd else 0.0,
+        character.grit if model.lsd else 0.0,
+        character.spark if model.lsd else 0.0,
+        character.space if model.lsd else 0.0,
         frame.energy,
         frame.bass,
         frame.brightness,
@@ -248,8 +257,9 @@ def _meter_line(index: int, frame: MusicFrame, model: VJModel, hit: bool) -> str
         f"{model.auto_scene_age:.3f}",
         model.last_auto_effect,
         _lsd_name(model),
-        f"{model.visual_theme.confidence:.3f}" if model.lsd else "0.000",
-        f"{model.visual_theme.margin:.3f}" if model.lsd else "0.000",
+        theme.motif if model.lsd else "off",
+        f"{theme.confidence:.3f}" if model.lsd else "0.000",
+        f"{theme.margin:.3f}" if model.lsd else "0.000",
         f"{model.lsd_shift:.3f}" if model.lsd else "0.000",
     ]
     fields.extend(f"{value:.3f}" for value in values)
