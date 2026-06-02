@@ -164,6 +164,8 @@ The model uses those values in two ways:
 
 - `MusicReactor` turns music into stage decisions: aggression, density, and
   whether to spawn an onset wave or fire an automatic effect from `1-9`.
+  In `--lsd`, it also uses the detected character values to bias effect timing
+  and selection.
 - `TempoClock` accepts confident audio BPM/phase hints while still respecting
   manual lock.
 - `LsdDirector` classifies the musical climate when `--lsd` is enabled and

@@ -8,7 +8,7 @@ from .effects import EFFECTS, EFFECT_BY_KEY, EffectSpec
 from .events import SocialIncoming
 from .lsd import DEFAULT_THEME, LsdDirector, LsdTheme
 from .music import MusicFrame
-from .music_reactor import DEFAULT_AGGRESSION, DEFAULT_DENSITY, MusicReactor
+from .music_reactor import DEFAULT_AGGRESSION, DEFAULT_DENSITY, MusicMood, MusicReactor
 from .timing import TimingState
 
 
@@ -143,10 +143,21 @@ class VJModel:
         return self.lsd_theme
 
     @property
-    def music_profile(self) -> str | None:
+    def music_mood(self) -> MusicMood | None:
         if not self.lsd or self.lsd_theme.confidence < 0.16:
             return None
-        return self.lsd_theme.profile
+        theme = self.lsd_theme
+        character = theme.character
+        return MusicMood(
+            theme.profile,
+            theme.confidence,
+            character.impact,
+            character.weight,
+            character.grit,
+            character.spark,
+            character.space,
+            theme.motion,
+        )
 
     @property
     def beat_time(self) -> float:
@@ -214,7 +225,7 @@ class VJModel:
             now,
             self.aggression,
             self.density,
-            self.music_profile,
+            self.music_mood,
         )
         self.aggression = reaction.aggression
         self.density = reaction.density

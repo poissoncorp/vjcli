@@ -77,6 +77,18 @@ PROFILE_ALTERNATES = {
 
 
 @dataclass(frozen=True)
+class MusicMood:
+    profile: str
+    confidence: float
+    impact: float
+    weight: float
+    grit: float
+    spark: float
+    space: float
+    motion: float
+
+
+@dataclass(frozen=True)
 class MusicTuning:
     confidence_threshold: float = 0.08
     onset_threshold: float = 0.64
@@ -118,7 +130,7 @@ class MusicReactor:
         now: float,
         aggression: float,
         density: float,
-        profile: str | None = None,
+        mood: MusicMood | None = None,
     ) -> MusicReaction:
         dt = self._frame_dt(now)
         if frame.confidence < self.tuning.confidence_threshold:
@@ -168,7 +180,7 @@ class MusicReactor:
                 scene_age,
                 scene_entered,
                 score,
-                profile,
+                mood,
                 response,
             )
             if self.frames_seen > 1
@@ -262,29 +274,33 @@ class MusicReactor:
         scene_age: float,
         scene_entered: bool,
         score: float,
-        profile: str | None,
+        mood: MusicMood | None,
         response: float,
     ) -> str | None:
         debounce = self.tuning.effect_debounce + (1.0 - response) * 0.46
+        if mood is not None:
+            debounce *= _mood_debounce_scale(mood)
         if scene_entered:
             debounce *= 0.62
         if now - self.last_effect_at < debounce:
             return None
         threshold = self.tuning.effect_threshold + (1.0 - response) * 0.18
+        if mood is not None:
+            threshold += _mood_threshold_shift(mood, scene)
         if scene_entered or scene_age < 0.35:
             threshold = max(0.0, threshold - 0.05 * response)
         if score < threshold:
             return None
         self.last_effect_at = now
-        key = _candidate_key(frame, scene, scene_age, self.pressure, profile)
-        key = self._avoid_repeat(key, scene, profile)
+        key = _candidate_key(frame, scene, scene_age, self.pressure, mood)
+        key = self._avoid_repeat(key, scene, mood)
         self._remember_effect(key)
         return key
 
-    def _avoid_repeat(self, key: str, scene: str, profile: str | None) -> str:
+    def _avoid_repeat(self, key: str, scene: str, mood: MusicMood | None) -> str:
         if key != self.last_effect_key or self.effect_repeat < 1:
             return key
-        return _alternate_key(scene, key, profile)
+        return _alternate_key(scene, key, mood)
 
     def _remember_effect(self, key: str) -> None:
         if key == self.last_effect_key:
@@ -299,14 +315,18 @@ def _candidate_key(
     scene: str,
     scene_age: float,
     pressure: float,
-    profile: str | None,
+    mood: MusicMood | None,
 ) -> str:
+    if mood is not None:
+        key = _mood_key(scene, pressure, mood)
+        if key is not None:
+            return key
     if scene == "chaos" and frame.drive > 0.78 and frame.mass > 0.58:
         return "1"
     if scene == "rupture" and pressure > 0.68 and scene_age < 0.90:
         return "2"
-    if profile is not None:
-        key = PROFILE_EFFECTS.get(profile, {}).get(scene)
+    if mood is not None:
+        key = PROFILE_EFFECTS.get(mood.profile, {}).get(scene)
         if key is not None:
             return key
     if scene == "rupture" and pressure > 0.62:
@@ -324,9 +344,27 @@ def _candidate_key(
     return "4"
 
 
-def _alternate_key(scene: str, key: str, profile: str | None) -> str:
-    if profile is not None:
-        key = PROFILE_ALTERNATES.get(profile, {}).get(key, key)
+def _mood_key(scene: str, pressure: float, mood: MusicMood) -> str | None:
+    if _mood_certainty(mood) < 0.20:
+        return None
+    if mood.motion > 0.40 and mood.impact > 0.46:
+        return "8" if mood.weight > 0.50 or pressure > 0.52 else "7"
+    if mood.space > 0.68 and mood.impact < 0.36:
+        return "6" if scene in ("drive", "fault") else "5"
+    if mood.spark > 0.70 and scene in ("drive", "fault", "weight"):
+        return "7"
+    if mood.grit > 0.68 and scene in ("rupture", "chaos"):
+        return "2" if mood.impact > 0.56 else "9"
+    if mood.weight > 0.70 and scene in ("weight", "chaos"):
+        return "8"
+    if mood.impact > 0.76 and scene in ("listen", "drive"):
+        return "4"
+    return None
+
+
+def _alternate_key(scene: str, key: str, mood: MusicMood | None) -> str:
+    if mood is not None:
+        key = PROFILE_ALTERNATES.get(mood.profile, {}).get(key, key)
         return key
     alternatives = {
         "drive": {"3": "4", "4": "6"},
@@ -336,6 +374,32 @@ def _alternate_key(scene: str, key: str, profile: str | None) -> str:
         "chaos": {"1": "8", "8": "9", "9": "2"},
     }
     return alternatives.get(scene, {}).get(key, key)
+
+
+def _mood_debounce_scale(mood: MusicMood) -> float:
+    certainty = _mood_certainty(mood)
+    scale = 1.0
+    scale -= mood.motion * certainty * 0.16
+    scale -= max(mood.impact, mood.grit) * certainty * 0.08
+    scale += mood.space * max(0.0, 1.0 - mood.impact) * certainty * 0.18
+    return max(0.72, min(1.18, scale))
+
+
+def _mood_threshold_shift(mood: MusicMood, scene: str) -> float:
+    certainty = _mood_certainty(mood)
+    shift = 0.0
+    shift -= mood.motion * certainty * 0.08
+    shift -= mood.impact * certainty * 0.04
+    if scene in ("drive", "fault"):
+        shift -= mood.spark * certainty * 0.04
+    if scene in ("weight", "rupture", "chaos"):
+        shift -= max(mood.weight, mood.grit) * certainty * 0.04
+    shift += mood.space * max(0.0, 1.0 - mood.impact) * certainty * 0.08
+    return max(-0.14, min(0.10, shift))
+
+
+def _mood_certainty(mood: MusicMood) -> float:
+    return _clamp((mood.confidence - 0.14) / 0.34)
 
 
 def _transition_strength(
