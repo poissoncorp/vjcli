@@ -147,7 +147,7 @@ class MusicReactor:
         self.frames_seen += 1
         response = _tempo_response(frame)
         self._update_pressure(frame, dt, response)
-        scene = self._stabilized_scene(_scene(frame, self.pressure, response), frame, now)
+        scene = self._stabilized_scene(_scene(frame, self.pressure, response, mood), frame, now)
         scene_age = self._set_scene(scene, now)
         scene_entered = scene_age == 0.0
         score = _trigger_score(frame, self.pressure, response)
@@ -432,7 +432,12 @@ def _attack(dt: float, speed: float) -> float:
     return max(0.0, min(1.0, dt * speed))
 
 
-def _scene(frame: MusicFrame, pressure: float, response: float) -> str:
+def _scene(
+    frame: MusicFrame,
+    pressure: float,
+    response: float,
+    mood: MusicMood | None = None,
+) -> str:
     restraint = 1.0 - response
     rupture_change = 0.72 + restraint * 0.14
     rupture_onset = 0.62 + restraint * 0.10
@@ -441,17 +446,39 @@ def _scene(frame: MusicFrame, pressure: float, response: float) -> str:
     weight_mass = 0.58 + restraint * 0.08
     drive_amount = 0.42 + restraint * 0.10
     drive_pressure = 0.38 + restraint * 0.10
+    scene = "listen"
     if frame.change > rupture_change and frame.onset > rupture_onset:
-        return "rupture"
-    if pressure > chaos_pressure or frame.drive > chaos_drive:
-        return "chaos"
-    if frame.mass > weight_mass:
-        return "weight"
-    if frame.brightness > 0.56 and frame.change > 0.34:
+        scene = "rupture"
+    elif pressure > chaos_pressure or frame.drive > chaos_drive:
+        scene = "chaos"
+    elif frame.mass > weight_mass:
+        scene = "weight"
+    elif frame.brightness > 0.56 and frame.change > 0.34:
+        scene = "fault"
+    elif frame.drive > drive_amount or pressure > drive_pressure:
+        scene = "drive"
+    return _mood_scene(scene, frame, pressure, mood)
+
+
+def _mood_scene(
+    scene: str,
+    frame: MusicFrame,
+    pressure: float,
+    mood: MusicMood | None,
+) -> str:
+    if mood is None or _mood_certainty(mood) < 0.20:
+        return scene
+    if mood.motion > 0.48 and mood.impact > 0.52:
+        return "rupture" if pressure < 0.74 else "chaos"
+    if mood.space > 0.72 and mood.impact < 0.40 and pressure < 0.54:
+        return "fault" if mood.spark > 0.56 else "listen"
+    if mood.spark > 0.72 and frame.change > 0.24 and scene in ("listen", "drive", "weight"):
         return "fault"
-    if frame.drive > drive_amount or pressure > drive_pressure:
-        return "drive"
-    return "listen"
+    if mood.weight > 0.70 and scene in ("listen", "drive", "fault"):
+        return "weight"
+    if mood.grit > 0.72 and pressure > 0.48 and scene in ("drive", "fault", "weight"):
+        return "rupture"
+    return scene
 
 
 def _scene_breaks_hold(scene: str, frame: MusicFrame, pressure: float) -> bool:
