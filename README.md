@@ -211,9 +211,9 @@ the visual climate, motion grammar, and bias automatic effect selection:
 - `hard` makes fast, dense, high-drive sections favor overdrive and blackout
 
 Each profile also carries live character values for pace, impact, weight, grit,
-spark, and space. Renderers use those values instead of re-interpreting raw
-audio, so the visual system can keep getting smarter without coupling every
-effect to the analyzer.
+spark, space, and climate motion. Renderers use those values instead of
+re-interpreting raw audio, so the visual system can keep getting smarter without
+coupling every effect to the analyzer.
 
 The mode is opt-in. Without `--lsd`, `vjctl` stays in the original red/black
 warehouse palette.

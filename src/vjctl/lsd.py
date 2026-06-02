@@ -33,6 +33,7 @@ class LsdTheme:
     margin: float = 0.0
     motif: str = "red"
     character: LsdCharacter = field(default_factory=LsdCharacter)
+    motion: float = 0.0
 
 
 DEFAULT_THEME = LsdTheme(
@@ -152,8 +153,16 @@ class LsdDirector:
         if frame.confidence < 0.08:
             for name in self.scores:
                 self.scores[name] = _follow(self.scores[name], 0.0, 0.06)
-            self.theme = _with_confidence(DEFAULT_THEME, 0.0)
+            character = _follow_character(self.theme.character, LsdCharacter(), 0.08)
+            motion = _follow(self.theme.motion, 0.0, 0.12)
+            self.theme = _with_confidence(DEFAULT_THEME, 0.0, character=character, motion=motion)
             return self.theme
+        character = _character(frame, timing)
+        smoothed = _follow_character(self.theme.character, character, 0.18)
+        target_motion = 0.0
+        if self.theme.confidence >= 0.08:
+            target_motion = _motion(character, self.theme.character)
+        motion = _follow(self.theme.motion, target_motion, 0.22)
         targets = _scores(frame, timing)
         for name, target in targets.items():
             self.scores[name] = _follow(self.scores.get(name, 0.0), target, 0.10)
@@ -164,7 +173,8 @@ class LsdDirector:
             PROFILES[name],
             confidence,
             margin,
-            _character(frame, timing),
+            smoothed,
+            motion,
         )
         return self.theme
 
@@ -180,6 +190,29 @@ def _character(frame: MusicFrame, timing: TimingState) -> LsdCharacter:
     space = _clamp(calm * 0.46 + frame.brightness * 0.34 + (1.0 - frame.mass) * 0.20)
     pace = _clamp(tempo * 0.50 + steady * 0.20 + frame.change * 0.18 + frame.onset * 0.12)
     return LsdCharacter(pace, impact, weight, grit, spark, space)
+
+
+def _follow_character(current: LsdCharacter, target: LsdCharacter, amount: float) -> LsdCharacter:
+    return LsdCharacter(
+        _follow(current.pace, target.pace, amount),
+        _follow(current.impact, target.impact, amount),
+        _follow(current.weight, target.weight, amount),
+        _follow(current.grit, target.grit, amount),
+        _follow(current.spark, target.spark, amount),
+        _follow(current.space, target.space, amount),
+    )
+
+
+def _motion(current: LsdCharacter, previous: LsdCharacter) -> float:
+    distance = (
+        abs(current.pace - previous.pace)
+        + abs(current.impact - previous.impact)
+        + abs(current.weight - previous.weight)
+        + abs(current.grit - previous.grit)
+        + abs(current.spark - previous.spark)
+        + abs(current.space - previous.space)
+    ) / 6.0
+    return _clamp(distance * 2.4)
 
 
 def _scores(frame: MusicFrame, timing: TimingState) -> dict[str, float]:
@@ -232,6 +265,7 @@ def _with_confidence(
     confidence: float,
     margin: float = 0.0,
     character: LsdCharacter | None = None,
+    motion: float = 0.0,
 ) -> LsdTheme:
     return LsdTheme(
         profile=theme.profile,
@@ -248,6 +282,7 @@ def _with_confidence(
         haze=theme.haze,
         motif=theme.motif,
         character=character or theme.character,
+        motion=_clamp(motion),
     )
 
 

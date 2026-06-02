@@ -29,6 +29,30 @@ class LsdMotifRenderer:
         if amount < 0.06:
             return
         render(buffer, model, beat_time, amount)
+        self._turn(buffer, model, beat_time)
+
+    def _turn(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
+        theme = model.visual_theme
+        turn = min(1.0, theme.motion * 0.82 + model.lsd_shift * 0.55)
+        if turn < 0.08:
+            return
+        salt = round(beat_time * (5 + turn * 9) * theme.speed_gain)
+        marks = 2 + round(turn * 6)
+        for index in range(marks):
+            y = 2 + grain(index, salt, 79) % max(1, buffer.height - 4)
+            x = grain(index, salt, 83) % max(1, buffer.width)
+            length = round(buffer.width * (0.05 + turn * 0.13))
+            direction = -1 if grain(index, salt, 89) % 2 else 1
+            for offset in range(length):
+                xx = x + offset * direction
+                if not (0 <= xx < buffer.width):
+                    continue
+                value = grain(xx, y, salt + index)
+                if value % 100 > 42 + turn * 36:
+                    continue
+                char = "=" if turn > 0.52 and offset % 4 == 0 else "-"
+                color = theme.accent if value % 7 == 0 else theme.primary
+                buffer.write_cell(xx, y, char, fg=color, bold=turn > 0.68)
 
     def _mist(
         self,
@@ -196,5 +220,6 @@ def _amount(model: VJModel) -> float:
     character = theme.character
     pressure = max(model.auto_pressure, model.auto_hit, character.impact * 0.26)
     amount = theme.confidence * 0.46 + pressure * 0.38 + model.beat_accent * 0.22
+    amount += theme.motion * 0.18
     amount *= 0.74 + theme.line_gain * 0.26
     return max(0.0, min(1.0, amount))
