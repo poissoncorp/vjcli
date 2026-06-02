@@ -34,6 +34,7 @@ class LsdTheme:
     motif: str = "red"
     character: LsdCharacter = field(default_factory=LsdCharacter)
     motion: float = 0.0
+    certainty: float = 0.0
 
 
 DEFAULT_THEME = LsdTheme(
@@ -169,12 +170,14 @@ class LsdDirector:
         name = _select_profile(self.scores, self.theme)
         margin = _margin(self.scores, name)
         confidence = _confidence(self.scores[name], margin, frame.confidence)
+        certainty = _certainty(confidence, margin)
         self.theme = _with_confidence(
             PROFILES[name],
             confidence,
             margin,
             smoothed,
             motion,
+            certainty,
         )
         return self.theme
 
@@ -260,12 +263,19 @@ def _confidence(score: float, margin: float, frame_confidence: float) -> float:
     return _clamp(score * frame_confidence * certainty)
 
 
+def _certainty(confidence: float, margin: float) -> float:
+    profile = _clamp((confidence - 0.14) / 0.34)
+    separation = _clamp((margin - 0.02) / 0.16)
+    return _clamp(profile * 0.62 + separation * 0.38)
+
+
 def _with_confidence(
     theme: LsdTheme,
     confidence: float,
     margin: float = 0.0,
     character: LsdCharacter | None = None,
     motion: float = 0.0,
+    certainty: float = 0.0,
 ) -> LsdTheme:
     return LsdTheme(
         profile=theme.profile,
@@ -283,6 +293,7 @@ def _with_confidence(
         motif=theme.motif,
         character=character or theme.character,
         motion=_clamp(motion),
+        certainty=_clamp(certainty),
     )
 
 

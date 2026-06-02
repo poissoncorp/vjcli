@@ -80,6 +80,7 @@ PROFILE_ALTERNATES = {
 class MusicMood:
     profile: str
     confidence: float
+    certainty: float
     impact: float
     weight: float
     grit: float
@@ -399,7 +400,7 @@ def _mood_threshold_shift(mood: MusicMood, scene: str) -> float:
 
 
 def _mood_certainty(mood: MusicMood) -> float:
-    return _clamp((mood.confidence - 0.14) / 0.34)
+    return _clamp(mood.certainty)
 
 
 def _transition_strength(

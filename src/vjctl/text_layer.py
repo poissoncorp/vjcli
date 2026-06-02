@@ -4,7 +4,7 @@ from .buffer import FrameBuffer
 from .model import VJModel
 from .noise import grain
 from .palette import BLACK, DEEP_RED, RED, Color
-from .text_art import choose_art
+from .text_art import choose_hero_art, choose_prompt_art
 
 PIXEL = "█"
 
@@ -32,7 +32,10 @@ class ArtText:
         beat_time: float,
         mode: str = "hero",
     ) -> None:
-        lines = choose_art(text, max(8, buffer.width - 8), max(5, buffer.height - 6))
+        width = max(8, buffer.width - 8)
+        height = max(5, buffer.height - 6)
+        chooser = choose_prompt_art if mode == "prompt" else choose_hero_art
+        lines = chooser(text, width, height)
         width = max(len(line) for line in lines)
         x = max(0, (buffer.width - width) // 2)
         y = max(2, (buffer.height - len(lines)) // 2)

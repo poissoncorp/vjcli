@@ -61,15 +61,32 @@ FONT_MEDIUM = {
     "'": ("## ", "## ", "   ", "   ", "   ", "   ", "   "),
 }
 
+PROMPT_SCALES = ((1, 1),)
+HERO_SCALES = ((3, 2), (2, 2), (2, 1), (1, 1))
+
+
+def choose_prompt_art(text: str, width: int, height: int) -> list[str]:
+    return _choose_art(text, width, height, PROMPT_SCALES)
+
+
+def choose_hero_art(text: str, width: int, height: int) -> list[str]:
+    return _choose_art(text, width, height, HERO_SCALES)
+
+
 def choose_art(text: str, width: int, height: int) -> list[str]:
+    return choose_hero_art(text, width, height)
+
+
+def _choose_art(
+    text: str,
+    width: int,
+    height: int,
+    figlet_scales: tuple[tuple[int, int], ...],
+) -> list[str]:
     text = normalize(text)
-    for figlet in _figlet_fonts():
-        lines = _line(text, figlet)
-        if _font_can_render(text, figlet, True) and _fits(lines, width, height):
-            return lines
-        wrapped = _wrapped(text, width, height, figlet, True)
-        if wrapped:
-            return wrapped
+    lines = _figlet_art(text, width, height, figlet_scales)
+    if lines:
+        return lines
     for font in (FONT_XL, FONT_LARGE, FONT_MEDIUM, FONT_SMALL):
         if not _font_can_render(text, font, False):
             continue
@@ -88,6 +105,64 @@ def choose_compact_art(text: str, width: int, height: int) -> list[str]:
         if lines:
             return lines
     return choose_art(text, width, height)
+
+
+def _figlet_art(
+    text: str,
+    width: int,
+    height: int,
+    scales: tuple[tuple[int, int], ...],
+) -> list[str]:
+    for font in _figlet_fonts():
+        if not _font_can_render(text, font, True):
+            continue
+        lines = _scaled_that_fits(_line(text, font), width, height, scales)
+        if lines:
+            return lines
+        wrapped = _scaled_wrapped(text, width, height, font, scales)
+        if wrapped:
+            return wrapped
+    return []
+
+
+def _scaled_that_fits(
+    lines: list[str],
+    width: int,
+    height: int,
+    scales: tuple[tuple[int, int], ...],
+) -> list[str]:
+    for x_scale, y_scale in scales:
+        scaled = _scale_lines(lines, x_scale, y_scale)
+        if _fits(scaled, width, height):
+            return scaled
+    return []
+
+
+def _scaled_wrapped(
+    text: str,
+    width: int,
+    height: int,
+    font: dict[str, tuple[str, ...]],
+    scales: tuple[tuple[int, int], ...],
+) -> list[str]:
+    for x_scale, y_scale in scales:
+        base_width = max(1, width // x_scale)
+        base_height = max(1, height // y_scale)
+        lines = _wrapped(text, base_width, base_height, font, True)
+        scaled = _scale_lines(lines, x_scale, y_scale)
+        if _fits(scaled, width, height):
+            return scaled
+    return []
+
+
+def _scale_lines(lines: list[str], x_scale: int, y_scale: int) -> list[str]:
+    if x_scale <= 1 and y_scale <= 1:
+        return lines
+    output: list[str] = []
+    for line in lines:
+        row = "".join(char * x_scale for char in line)
+        output.extend(row for _ in range(y_scale))
+    return _trim(output)
 
 
 def normalize(text: str) -> str:
@@ -219,7 +294,13 @@ def _font_gap(font: dict[str, tuple[str, ...]]) -> int:
     return 1
 
 
-def _wrapped(text: str, width: int, height: int, font: dict[str, tuple[str, ...]], exact: bool) -> list[str]:
+def _wrapped(
+    text: str,
+    width: int,
+    height: int,
+    font: dict[str, tuple[str, ...]],
+    exact: bool,
+) -> list[str]:
     blocks: list[list[str]] = []
     line = ""
     for word in text.split():
@@ -289,7 +370,10 @@ def _trim(lines: list[str]) -> list[str]:
 def _small(rows: tuple[str, ...]) -> tuple[str, ...]:
     sample_y = (0, 1, 3, 5, 6)
     sample_x = (0, len(rows[0]) // 2, len(rows[0]) - 1)
-    return tuple("".join("#" if rows[y][x] != " " else " " for x in sample_x if x < len(rows[y])) for y in sample_y)
+    return tuple(
+        "".join("#" if rows[y][x] != " " else " " for x in sample_x if x < len(rows[y]))
+        for y in sample_y
+    )
 
 
 def _large(rows: tuple[str, ...]) -> tuple[str, ...]:

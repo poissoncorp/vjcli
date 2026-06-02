@@ -151,6 +151,7 @@ class VJModel:
         return MusicMood(
             theme.profile,
             theme.confidence,
+            theme.certainty,
             character.impact,
             character.weight,
             character.grit,
