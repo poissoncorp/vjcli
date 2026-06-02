@@ -148,7 +148,9 @@ def run_meter(
     model = VJModel(music_tuning=music_tuning or MusicTuning())
     interval = 1.0 / max(1, fps)
     next_at = time.monotonic()
-    sys.stdout.write("frame energy bass high dens onset change conf bpm bconf trig aggr mdens\n")
+    sys.stdout.write(
+        "frame energy bass high dens onset change conf bpm bconf clock trig aggr mdens\n"
+    )
     try:
         for index in range(max(0, frames)):
             now = time.monotonic()
@@ -200,6 +202,7 @@ def _meter_line(index: int, frame: MusicFrame, model: VJModel, hit: bool) -> str
         frame.confidence,
         frame.beat_bpm,
         frame.beat_confidence,
+        model.clock.target_bpm,
         1.0 if hit else 0.0,
         model.effective_aggression,
         model.effective_density,

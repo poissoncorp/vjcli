@@ -170,6 +170,7 @@ class VJModel:
 
     def apply_music(self, frame: MusicFrame, now: float) -> None:
         self.music = frame
+        self.clock.suggest_bpm(frame.beat_bpm, frame.beat_confidence)
         if frame.confidence < self.music_tuning.confidence_threshold:
             self.aggression = _follow(self.aggression, DEFAULT_AGGRESSION, 0.05)
             self.density = _follow(self.density, DEFAULT_DENSITY, 0.05)

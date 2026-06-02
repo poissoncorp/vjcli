@@ -60,6 +60,13 @@ class TempoClock:
     def slider(self, amount: float) -> None:
         self.target_bpm = _clamp_bpm(self.target_bpm + amount)
 
+    def suggest_bpm(self, bpm: float, confidence: float) -> None:
+        if self.locked or bpm <= 0.0 or confidence < 0.68:
+            return
+        target = _clamp_bpm(bpm)
+        amount = min(0.18, max(0.04, confidence * 0.14))
+        self.target_bpm += (target - self.target_bpm) * amount
+
     def jog(self, amount: float) -> None:
         self.phase += amount
         while self.phase >= 1.0:
