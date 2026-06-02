@@ -13,7 +13,7 @@ from .audio_input import AudioInputSource
 from .effects import EFFECT_BY_KEY
 from .input import InputDecoder, InputEvent
 from .model import VJModel
-from .music import MusicSource
+from .music import MusicFrame, MusicSource
 from .renderer import Renderer
 from .sources import SimulatedMusicSource, SimulatedSocialSource
 
@@ -117,6 +117,39 @@ def render_preview(frames: int, width: int, height: int, fps: int = 12, music: s
     return "\n".join(lines)
 
 
+def run_meter(
+    music: str,
+    audio_device: str | int | None = None,
+    frames: int = 120,
+    fps: int = 20,
+) -> int:
+    if music == "none":
+        sys.stderr.write("Choose --music demo or --music audio for meter.\n")
+        return 2
+    try:
+        source = _music_source(music, audio_device)
+    except RuntimeError as error:
+        sys.stderr.write(f"{error}\n")
+        return 2
+    if source is None:
+        return 2
+    interval = 1.0 / max(1, fps)
+    next_at = time.monotonic()
+    sys.stdout.write("frame energy bass high dens onset change conf\n")
+    try:
+        for index in range(max(0, frames)):
+            frame = source.poll(time.monotonic()) or MusicFrame()
+            sys.stdout.write(_meter_line(index, frame))
+            sys.stdout.flush()
+            next_at += interval
+            delay = next_at - time.monotonic()
+            if delay > 0.0:
+                time.sleep(delay)
+        return 0
+    finally:
+        _close_source(source)
+
+
 def _music_source(name: str, audio_device: str | int | None = None) -> MusicSource | None:
     if name == "demo":
         return SimulatedMusicSource()
@@ -137,6 +170,19 @@ def _poll_music(model: VJModel, source: MusicSource | None, now: float) -> None:
     frame = source.poll(now)
     if frame is not None:
         model.apply_music(frame, now)
+
+
+def _meter_line(index: int, frame: MusicFrame) -> str:
+    values = (
+        frame.energy,
+        frame.bass,
+        frame.brightness,
+        frame.density,
+        frame.onset,
+        frame.change,
+        frame.confidence,
+    )
+    return f"{index:05d} " + " ".join(f"{value:.3f}" for value in values) + "\n"
 
 
 def _read_events(decoder: InputDecoder) -> list[InputEvent]:
