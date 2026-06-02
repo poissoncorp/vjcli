@@ -24,14 +24,19 @@ class AudioInputSource:
         self.samples: deque[float] = deque(maxlen=sample_rate)
         self.lock = Lock()
         self.analyzer = AudioAnalyzer()
-        self.stream = sounddevice.InputStream(
-            device=device,
-            channels=1,
-            samplerate=sample_rate,
-            blocksize=block_size,
-            callback=self._callback,
-        )
-        self.stream.start()
+        self.stream = None
+        try:
+            self.stream = sounddevice.InputStream(
+                device=device,
+                channels=1,
+                samplerate=sample_rate,
+                blocksize=block_size,
+                callback=self._callback,
+            )
+            self.stream.start()
+        except Exception as exc:
+            self.close()
+            raise RuntimeError(_audio_open_message(device, exc)) from exc
 
     def poll(self, now: float) -> MusicFrame | None:
         with self.lock:
@@ -44,8 +49,18 @@ class AudioInputSource:
         return self.analyzer.read(samples, self.sample_rate)
 
     def close(self) -> None:
-        self.stream.stop()
-        self.stream.close()
+        stream = self.stream
+        if stream is None:
+            return
+        try:
+            stream.stop()
+        except Exception:
+            pass
+        try:
+            stream.close()
+        except Exception:
+            pass
+        self.stream = None
 
     def _callback(self, indata, _frames, _time, _status) -> None:
         with self.lock:
@@ -68,3 +83,11 @@ def audio_device_lines() -> list[str]:
         rate = round(float(device.get("default_samplerate", 0.0)))
         lines.append(f"{index}: {name} ({inputs} in, {rate} Hz)")
     return lines
+
+
+def _audio_open_message(device: str | int | None, error: Exception) -> str:
+    name = "default input" if device is None else f"input {device}"
+    detail = str(error).strip()
+    if detail:
+        return f"Could not open {name}: {detail}. Run `vjctl --list-audio-devices`."
+    return f"Could not open {name}. Run `vjctl --list-audio-devices`."
