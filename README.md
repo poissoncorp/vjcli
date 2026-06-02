@@ -167,7 +167,8 @@ The model uses those values in two ways:
 - `TempoClock` accepts confident audio BPM/phase hints while still respecting
   manual lock.
 - `LsdDirector` classifies the musical climate when `--lsd` is enabled and
-  chooses the color, speed, line weight, kick impact, and haze profile.
+  chooses the color, speed, line weight, kick impact, haze, and AutoVJ effect
+  bias.
 
 That means audio can guide the free clock, but four steady manual taps still win.
 Releasing effects or resetting to free roam does not restart the underlying loop
@@ -197,14 +198,14 @@ decision.
 ## LSD Mode
 
 `--lsd` keeps the same control model and effect timing, but lets the track choose
-the visual climate:
+the visual climate and bias automatic effect selection:
 
 - `velvet` slows down and softens calm, airy material
-- `house` keeps kick response clean and warm
-- `acid` pushes bright, unstable, high-frequency tracks
+- `house` keeps kick response clean and warm, favoring impact and pressure
+- `acid` pushes bright, unstable, high-frequency tracks toward chroma and smear
 - `spectral` opens up cold, sparse, melodic space
-- `industrial` adds grit and heavier line pressure
-- `hard` makes fast, dense, high-drive sections hit harder
+- `industrial` adds grit, heavier line pressure, quake, and blackout bias
+- `hard` makes fast, dense, high-drive sections favor overdrive and blackout
 
 The mode is opt-in. Without `--lsd`, `vjctl` stays in the original red/black
 warehouse palette.

@@ -140,6 +140,12 @@ class VJModel:
         return self.lsd_theme
 
     @property
+    def music_profile(self) -> str | None:
+        if not self.lsd or self.lsd_theme.confidence < 0.16:
+            return None
+        return self.lsd_theme.profile
+
+    @property
     def beat_time(self) -> float:
         return self.timing.beat_time
 
@@ -199,7 +205,13 @@ class VJModel:
         self.clock.suggest_audio(frame.beat_bpm, frame.beat_phase, frame.beat_confidence)
         if self.lsd:
             self.lsd_theme = self.lsd_director.update(frame, self.timing)
-        reaction = self.music_reactor.react(frame, now, self.aggression, self.density)
+        reaction = self.music_reactor.react(
+            frame,
+            now,
+            self.aggression,
+            self.density,
+            self.music_profile,
+        )
         self.aggression = reaction.aggression
         self.density = reaction.density
         self.auto_scene = reaction.scene

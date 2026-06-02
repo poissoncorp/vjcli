@@ -15,6 +15,66 @@ SCENE_HOLD = {
     "chaos": 0.42,
 }
 
+PROFILE_EFFECTS = {
+    "velvet": {
+        "listen": "4",
+        "drive": "6",
+        "fault": "6",
+        "weight": "5",
+        "rupture": "9",
+        "chaos": "8",
+    },
+    "house": {
+        "listen": "4",
+        "drive": "3",
+        "fault": "6",
+        "weight": "5",
+        "rupture": "4",
+        "chaos": "8",
+    },
+    "acid": {
+        "listen": "7",
+        "drive": "6",
+        "fault": "7",
+        "weight": "7",
+        "rupture": "9",
+        "chaos": "1",
+    },
+    "spectral": {
+        "listen": "4",
+        "drive": "6",
+        "fault": "7",
+        "weight": "5",
+        "rupture": "9",
+        "chaos": "8",
+    },
+    "industrial": {
+        "listen": "6",
+        "drive": "6",
+        "fault": "7",
+        "weight": "8",
+        "rupture": "2",
+        "chaos": "1",
+    },
+    "hard": {
+        "listen": "3",
+        "drive": "1",
+        "fault": "7",
+        "weight": "8",
+        "rupture": "2",
+        "chaos": "1",
+    },
+}
+
+PROFILE_ALTERNATES = {
+    "velvet": {"6": "4", "4": "5", "5": "6", "8": "9", "9": "8"},
+    "house": {"3": "4", "4": "5", "5": "3", "6": "4", "8": "5"},
+    "acid": {"7": "6", "6": "7", "9": "7", "1": "8"},
+    "spectral": {"4": "6", "6": "7", "7": "4", "5": "8", "9": "8"},
+    "industrial": {"6": "7", "7": "8", "8": "2", "2": "9", "1": "8"},
+    "hard": {"1": "8", "8": "2", "2": "9", "9": "1", "7": "1"},
+}
+
 
 @dataclass(frozen=True)
 class MusicTuning:
@@ -58,6 +118,7 @@ class MusicReactor:
         now: float,
         aggression: float,
         density: float,
+        profile: str | None = None,
     ) -> MusicReaction:
         dt = self._frame_dt(now)
         if frame.confidence < self.tuning.confidence_threshold:
@@ -95,7 +156,7 @@ class MusicReactor:
             )
         )
         effect_key = (
-            self._effect_key(frame, now, scene, scene_age, scene_entered, score)
+            self._effect_key(frame, now, scene, scene_age, scene_entered, score, profile)
             if self.frames_seen > 1
             else None
         )
@@ -184,6 +245,7 @@ class MusicReactor:
         scene_age: float,
         scene_entered: bool,
         score: float,
+        profile: str | None,
     ) -> str | None:
         debounce = self.tuning.effect_debounce
         if scene_entered:
@@ -196,15 +258,15 @@ class MusicReactor:
         if score < threshold:
             return None
         self.last_effect_at = now
-        key = _candidate_key(frame, scene, scene_age, self.pressure)
-        key = self._avoid_repeat(key, scene)
+        key = _candidate_key(frame, scene, scene_age, self.pressure, profile)
+        key = self._avoid_repeat(key, scene, profile)
         self._remember_effect(key)
         return key
 
-    def _avoid_repeat(self, key: str, scene: str) -> str:
+    def _avoid_repeat(self, key: str, scene: str, profile: str | None) -> str:
         if key != self.last_effect_key or self.effect_repeat < 1:
             return key
-        return _alternate_key(scene, key)
+        return _alternate_key(scene, key, profile)
 
     def _remember_effect(self, key: str) -> None:
         if key == self.last_effect_key:
@@ -214,11 +276,21 @@ class MusicReactor:
         self.effect_repeat = 0
 
 
-def _candidate_key(frame: MusicFrame, scene: str, scene_age: float, pressure: float) -> str:
+def _candidate_key(
+    frame: MusicFrame,
+    scene: str,
+    scene_age: float,
+    pressure: float,
+    profile: str | None,
+) -> str:
     if scene == "chaos" and frame.drive > 0.78 and frame.mass > 0.58:
         return "1"
     if scene == "rupture" and pressure > 0.68 and scene_age < 0.90:
         return "2"
+    if profile is not None:
+        key = PROFILE_EFFECTS.get(profile, {}).get(scene)
+        if key is not None:
+            return key
     if scene == "rupture" and pressure > 0.62:
         return "1"
     if scene == "rupture":
@@ -234,7 +306,10 @@ def _candidate_key(frame: MusicFrame, scene: str, scene_age: float, pressure: fl
     return "4"
 
 
-def _alternate_key(scene: str, key: str) -> str:
+def _alternate_key(scene: str, key: str, profile: str | None) -> str:
+    if profile is not None:
+        key = PROFILE_ALTERNATES.get(profile, {}).get(key, key)
+        return key
     alternatives = {
         "drive": {"3": "4", "4": "6"},
         "fault": {"7": "6", "6": "4"},
