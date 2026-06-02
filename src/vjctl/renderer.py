@@ -5,6 +5,7 @@ from .buffer import FrameBuffer
 from .debug_overlay import DebugOverlay
 from .effect_renderers import EffectRenderers
 from .model import VJModel
+from .scene_renderer import SceneRenderer
 from .text_layer import TextLayer
 from .wave_renderer import WaveRenderer
 
@@ -14,6 +15,7 @@ class Renderer:
         self._previous_rows: list[str] = []
         self._text = TextLayer()
         self._effects = EffectRenderers(self._text)
+        self._scene = SceneRenderer()
         self._waves = WaveRenderer()
         self._debug = DebugOverlay()
 
@@ -24,6 +26,7 @@ class Renderer:
         buffer = FrameBuffer(width, height)
         beat_time = model.beat_time
         self._effects.background(buffer, model, beat_time)
+        self._scene.render(buffer, model, beat_time)
         self._waves.render(buffer, model.waves, now)
         self._effects.effects(buffer, model, beat_time)
         self._text.hud(buffer, model, beat_time)

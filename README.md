@@ -160,11 +160,11 @@ Automatic effect selection is driven by a tiny scene director. It tracks pressur
 over time, classifies the current moment, and uses that scene to choose effects:
 
 - `listen` keeps the app restrained
-- `drive` can trigger `3` pressure
-- `fault` can trigger `7` chroma
-- `weight` can trigger `5` tunnel
-- `rupture` can trigger `2` blackout or `9` collapse
-- `chaos` can trigger `1` overdrive or `8` quake
+- `drive` draws current rails and can trigger `3` pressure
+- `fault` draws chromatic slips and can trigger `7` chroma
+- `weight` draws low-end columns and can trigger `5` tunnel
+- `rupture` draws hard cuts and can trigger `2` blackout or `9` collapse
+- `chaos` combines rails, slips, cuts, and can trigger `1` overdrive or `8` quake
 - clean hits can still fall back to `4` impact
 
 `0` stays manual. It is the operator's free-roam reset, not an automatic music
@@ -251,8 +251,8 @@ The project is a small modular monolith:
 - `clock.py` owns free/manual/audio timing.
 - `timing.py` exposes the neutral timing state.
 - `model.py` owns scene state: waves, text, effects, music, and socials.
-- `renderer.py`, `wave_renderer.py`, `effect_renderers.py`, and `text_layer.py`
-  turn model state into ANSI frames.
+- `renderer.py`, `scene_renderer.py`, `wave_renderer.py`, `effect_renderers.py`,
+  and `text_layer.py` turn model state into ANSI frames.
 
 Renderer code reads state. Sources and adapters produce events or music frames.
 The model applies decisions. This keeps future inputs such as Link, deck metadata,
