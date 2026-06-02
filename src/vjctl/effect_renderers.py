@@ -7,21 +7,18 @@ from .effects import EFFECT_RENDER_ORDER
 from .model import VJModel
 from .noise import grain
 from .palette import BLACK
-from .text_art import choose_art
-from .text_layer import TextLayer
 from .wave_renderer import draw_shockwave
 
 
 class EffectRenderers:
-    def __init__(self, text: TextLayer) -> None:
-        self._text = text
+    def __init__(self) -> None:
         self._renderers = {
             "overdrive": self._overdrive,
             "pressure": self._pressure,
             "blackout": self._blackout,
             "smear": self._smear,
             "tunnel": self._tunnel,
-            "impact": self._impact,
+            "slam": self._slam,
             "chroma": self._chroma,
             "quake": self._quake,
             "collapse": self._collapse,
@@ -195,7 +192,7 @@ class EffectRenderers:
                 buffer.write_cell(cx - w // 2, y, char, fg=color)
                 buffer.write_cell(cx + w // 2, y, char, fg=color)
 
-    def _impact(
+    def _slam(
         self,
         buffer: FrameBuffer,
         model: VJModel,
@@ -206,21 +203,59 @@ class EffectRenderers:
         if release <= 0.02:
             return
         theme = model.visual_theme
-        height = min(9, max(5, buffer.height - 4))
-        lines = choose_art("DROP IMPACT", max(8, buffer.width - 8), height)
-        width = max(len(line) for line in lines)
-        x = max(0, (buffer.width - width) // 2)
-        y = max(2, (buffer.height - len(lines)) // 2)
-        self._text.write_lines(buffer, lines, x, y, theme.primary, model, beat_time)
-        if release <= 0.55:
-            return
-        buffer.write_text(0, max(0, y - 2), "-" * buffer.width, fg=theme.primary, bold=True)
-        bottom_y = min(buffer.height - 1, y + len(lines) + 1)
-        buffer.write_text(0, bottom_y, "-" * buffer.width, fg=theme.primary, bold=True)
-        for offset in range(-5, 6):
-            yy = y + len(lines) // 2 + offset
-            if 0 <= yy < buffer.height and offset % 2 == 0:
-                buffer.write_text(0, yy, "=" * buffer.width, fg=theme.deep, dim=abs(offset) > 2)
+        amount = min(1.0, release * theme.kick_gain + charge * 0.4)
+        salt = round(beat_time * 8 * theme.speed_gain)
+        self._slam_gate(buffer, model, amount, salt)
+        self._slam_bars(buffer, model, amount, salt)
+        self._slam_faults(buffer, model, amount, salt)
+
+    def _slam_gate(self, buffer: FrameBuffer, model: VJModel, amount: float, salt: int) -> None:
+        theme = model.visual_theme
+        pulse = 0.18 + amount * 0.46
+        for y in range(1, buffer.height - 1):
+            if grain(y, salt, 89) % 100 > 18 + amount * 34:
+                continue
+            for x in range(buffer.width):
+                phase = (x + y * 3 + salt) % 17
+                if phase > 4 + amount * 7:
+                    continue
+                color = theme.accent if phase < 2 else theme.primary
+                buffer.write_cell(x, y, " ", fg=color, bg=color if phase < pulse * 12 else BLACK)
+
+    def _slam_bars(self, buffer: FrameBuffer, model: VJModel, amount: float, salt: int) -> None:
+        theme = model.visual_theme
+        cy = buffer.height // 2
+        span = round(buffer.width * (0.28 + amount * 0.34))
+        rows = (-5, -3, -1, 0, 1, 3, 5)
+        for offset in rows:
+            y = cy + offset
+            if not (1 <= y < buffer.height - 1):
+                continue
+            char = "█" if abs(offset) <= 1 and amount > 0.62 else "="
+            step = 1 if abs(offset) <= 1 else 2
+            for x in range(buffer.width // 2 - span, buffer.width // 2 + span + 1, step):
+                if grain(x, y, salt + offset) % 100 > 66 + amount * 20:
+                    continue
+                color = theme.accent if abs(offset) <= 1 else theme.primary
+                buffer.write_cell(x, y, char, fg=color, bold=abs(offset) <= 1)
+
+    def _slam_faults(self, buffer: FrameBuffer, model: VJModel, amount: float, salt: int) -> None:
+        theme = model.visual_theme
+        faults = 6 + round(amount * 8)
+        for index in range(faults):
+            y = 2 + grain(index, salt, 103) % max(1, buffer.height - 4)
+            x0 = grain(index, salt, 107) % max(1, buffer.width)
+            length = round(buffer.width * (0.08 + amount * 0.20))
+            direction = -1 if grain(index, salt, 109) % 2 else 1
+            for i in range(length):
+                x = x0 + i * direction
+                if not (0 <= x < buffer.width):
+                    continue
+                if grain(x, y, salt + index) % 100 > 52 + amount * 34:
+                    continue
+                char = "=" if i % 3 == 0 else "-"
+                color = theme.primary if i % 5 else theme.deep
+                buffer.write_cell(x, y, char, fg=color, dim=amount < 0.62)
 
     def _chroma(
         self,

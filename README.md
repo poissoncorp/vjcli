@@ -183,7 +183,7 @@ over time, classifies the current moment, and uses that scene to choose effects:
 - `weight` draws low-end columns and can trigger `5` tunnel
 - `rupture` draws hard cuts and can trigger `2` blackout or `9` collapse
 - `chaos` combines rails, slips, cuts, and can trigger `1` overdrive or `8` quake
-- clean hits can still fall back to `4` impact
+- clean hits can still fall back to `4` slam
 
 The director tracks scene age and avoids repeating the same automatic effect
 back-to-back, so a sustained section can escalate instead of looping one hit.
@@ -191,6 +191,9 @@ Entering a strong scene can also spawn its own transition wave, even when the
 audio block is not a clean onset.
 Scenes hold briefly before demoting, so AutoVJ keeps stage weight instead of
 flickering between modes every analyzer frame.
+Slower, oldschool-tempo material gets extra restraint: kicks can still create
+visible waves, but automatic effects need stronger evidence before escalating
+into rupture or chaos.
 
 `0` stays manual. It is the operator's free-roam reset, not an automatic music
 decision.
@@ -201,7 +204,7 @@ decision.
 the visual climate and bias automatic effect selection:
 
 - `velvet` slows down and softens calm, airy material
-- `house` keeps kick response clean and warm, favoring impact and pressure
+- `house` keeps kick response clean and warm, favoring slam and pressure
 - `acid` pushes bright, unstable, high-frequency tracks toward chroma and smear
 - `spectral` opens up cold, sparse, melodic space
 - `industrial` adds grit, heavier line pressure, quake, and blackout bias
@@ -260,7 +263,7 @@ non-digit character, digits become normal text.
 | `1` | Overdrive | Maximum pressure |
 | `2` | Blackout | Hard gate |
 | `3` | Pressure | Mid-level field stress |
-| `4` | Impact | Visible hit |
+| `4` | Slam | Visible hit |
 | `5` | Tunnel | Spatial pull |
 | `6` | Smear | Drag and trail |
 | `7` | Chroma | Glitch split |

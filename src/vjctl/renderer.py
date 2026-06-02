@@ -14,7 +14,7 @@ class Renderer:
     def __init__(self) -> None:
         self._previous_rows: list[str] = []
         self._text = TextLayer()
-        self._effects = EffectRenderers(self._text)
+        self._effects = EffectRenderers()
         self._scene = SceneRenderer()
         self._waves = WaveRenderer()
         self._debug = DebugOverlay()
