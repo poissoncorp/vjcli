@@ -9,13 +9,18 @@ from .music import MusicFrame
 class AudioAnalyzer:
     def __init__(self) -> None:
         self.level = 0.08
+        self.time = 0.0
         self.energy = 0.0
         self.bass = 0.0
         self.brightness = 0.0
+        self.last_beat_at: float | None = None
+        self.beat_interval = 0.0
+        self.beat_confidence = 0.0
 
     def read(self, samples: Sequence[float], sample_rate: int) -> MusicFrame:
         if not samples or sample_rate <= 0:
             return MusicFrame()
+        self.time += len(samples) / sample_rate
         samples = self._normalize(samples)
         energy = _clamp(_rms(samples) * 1.9)
         bass = _clamp(_band(samples, sample_rate, (46.0, 58.0, 73.0, 92.0, 116.0)) * 1.35)
@@ -29,6 +34,7 @@ class AudioAnalyzer:
         onset = _clamp(max(energy_rise * 4.2, bass_rise * 3.4))
         change = _clamp(energy_rise * 2.2 + bass_rise * 1.4 + color_shift * 0.72)
         confidence = _clamp(energy * 1.7 + max(bass, middle, high) * 0.6)
+        self._track_beat(onset, confidence)
         self.energy = _follow(self.energy, energy, 0.34)
         self.bass = _follow(self.bass, bass, 0.38)
         self.brightness = _follow(self.brightness, brightness, 0.28)
@@ -40,6 +46,8 @@ class AudioAnalyzer:
             onset=onset,
             change=change,
             confidence=confidence,
+            beat_interval=self.beat_interval,
+            beat_confidence=self.beat_confidence,
         )
 
     def _normalize(self, samples: Sequence[float]) -> list[float]:
@@ -49,6 +57,34 @@ class AudioAnalyzer:
         self.level = _follow(self.level, target, amount)
         gain = min(9.5, 0.76 / max(0.08, self.level))
         return [_clip_sample(sample * gain) for sample in samples]
+
+    def _track_beat(self, onset: float, confidence: float) -> None:
+        if onset < 0.72 or confidence < 0.32:
+            self.beat_confidence *= 0.94
+            return
+        if self.last_beat_at is None:
+            self.last_beat_at = self.time
+            self.beat_confidence = max(self.beat_confidence, onset * 0.28)
+            return
+        interval = self.time - self.last_beat_at
+        if interval < 0.34:
+            self.beat_confidence *= 0.9
+            return
+        self.last_beat_at = self.time
+        if interval > 1.5:
+            self.beat_confidence *= 0.7
+            return
+        stability = 0.5
+        if self.beat_interval > 0.0:
+            drift = abs(interval - self.beat_interval) / max(0.001, self.beat_interval)
+            stability = max(0.0, 1.0 - drift)
+        amount = 0.5 if stability > 0.72 else 0.24
+        self.beat_interval = interval if self.beat_interval <= 0.0 else _follow(
+            self.beat_interval,
+            interval,
+            amount,
+        )
+        self.beat_confidence = _clamp(onset * 0.38 + confidence * 0.2 + stability * 0.42)
 
 
 def _rms(samples: Sequence[float]) -> float:
