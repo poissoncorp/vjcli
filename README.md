@@ -2,8 +2,8 @@
 
 Live terminal VJ instrument for Ghostty.
 
-vjctl turns a terminal into a playable visual surface: tap tempo, shockwaves, text hits, blackout gates,
-glitch pressure, and warehouse-red ANSI chaos.
+vjctl turns a terminal into a playable visual surface: tap tempo, shockwaves, text hits,
+blackout gates, glitch pressure, and warehouse-red ANSI chaos.
 
 It is built for DJ/VJ sets where you want something fast, dirty, keyboard-driven, and alive without
 opening a browser or a heavyweight visual stack.
@@ -37,6 +37,16 @@ Or run with a synthetic music-reactive feed:
 ```bash
 vjctl --music demo
 ```
+
+For live audio input:
+
+```bash
+python3 -m pip install -e '.[audio]'
+vjctl --music audio
+```
+
+On macOS, route system/DJ audio into an input device with BlackHole or a real audio interface,
+then select it with `--audio-device` if needed.
 
 Or run from the repo without installing:
 

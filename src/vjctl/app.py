@@ -9,6 +9,7 @@ import time
 import tty
 
 from .ansi import ALT_SCREEN, CLEAR, HIDE_CURSOR, MAIN_SCREEN, RESET, SHOW_CURSOR
+from .audio_input import AudioInputSource
 from .effects import EFFECT_BY_KEY
 from .input import InputDecoder, InputEvent
 from .model import VJModel
@@ -36,18 +37,22 @@ class TerminalSession:
             termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original)
 
 
-def run(music: str = "none") -> int:
+def run(music: str = "none", audio_device: str | int | None = None) -> int:
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         sys.stderr.write(
             "vjctl needs an interactive terminal. Use --preview-frames for text preview.\n"
         )
+        return 2
+    try:
+        music_source = _music_source(music, audio_device)
+    except RuntimeError as error:
+        sys.stderr.write(f"{error}\n")
         return 2
 
     model = VJModel()
     renderer = Renderer()
     decoder = InputDecoder()
     social_source = SimulatedSocialSource()
-    music_source = _music_source(music)
     target_dt = 1.0 / 60.0
     last_frame = time.monotonic()
     last_esc_check = last_frame
@@ -83,13 +88,15 @@ def run(music: str = "none") -> int:
                     time.sleep(target_dt - elapsed)
     except KeyboardInterrupt:
         return 0
+    finally:
+        _close_source(music_source)
 
 
 def render_preview(frames: int, width: int, height: int, fps: int = 12, music: str = "none") -> str:
     model = VJModel()
     renderer = Renderer()
     social_source = SimulatedSocialSource()
-    music_source = _music_source(music)
+    music_source = _music_source(music if music == "demo" else "none")
     lines: list[str] = []
     now = 0.0
     dt = 1.0 / max(1, fps)
@@ -110,10 +117,18 @@ def render_preview(frames: int, width: int, height: int, fps: int = 12, music: s
     return "\n".join(lines)
 
 
-def _music_source(name: str) -> MusicSource | None:
+def _music_source(name: str, audio_device: str | int | None = None) -> MusicSource | None:
     if name == "demo":
         return SimulatedMusicSource()
+    if name == "audio":
+        return AudioInputSource(device=audio_device)
     return None
+
+
+def _close_source(source: MusicSource | None) -> None:
+    close = getattr(source, "close", None)
+    if close is not None:
+        close()
 
 
 def _poll_music(model: VJModel, source: MusicSource | None, now: float) -> None:

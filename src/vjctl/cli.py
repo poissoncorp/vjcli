@@ -8,7 +8,8 @@ from .app import render_preview, run
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="vjctl", description="Terminal VJ control realm.")
-    parser.add_argument("--music", choices=("none", "demo"), default="none")
+    parser.add_argument("--music", choices=("none", "demo", "audio"), default="none")
+    parser.add_argument("--audio-device", default=None)
     parser.add_argument("--preview-frames", type=int, default=0, help=argparse.SUPPRESS)
     parser.add_argument("--width", type=int, default=132, help=argparse.SUPPRESS)
     parser.add_argument("--height", type=int, default=36, help=argparse.SUPPRESS)
@@ -22,7 +23,15 @@ def main(argv: list[str] | None = None) -> int:
             render_preview(args.preview_frames, args.width, args.height, music=args.music)
         )
         return 0
-    return run(args.music)
+    return run(args.music, _audio_device(args.audio_device))
+
+
+def _audio_device(value: str | None) -> str | int | None:
+    if value is None:
+        return None
+    if value.isdigit():
+        return int(value)
+    return value
 
 
 if __name__ == "__main__":
