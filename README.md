@@ -149,6 +149,21 @@ available for fine tuning.
 Any direct threshold, sensitivity, or visual-mode override is treated as a
 custom setup layered on top of the selected preset.
 
+Use a local config when you want the same setup every time:
+
+```toml
+[performance]
+preset = "minimal"
+visual_mode = "waves"
+sensitivity = 0.18
+effect_threshold = 0.90
+```
+
+`vjctl` reads `vjctl.toml` from the current directory when it exists. The file is
+ignored by git, so it can stay personal. Use `--config path/to/file.toml` for a
+specific file, or `--no-config` to ignore local config for one run. CLI flags
+still win over config values.
+
 Run with live audio:
 
 ```bash
@@ -197,6 +212,8 @@ The model uses those values in two ways:
 - `--preset` is the fast setup layer. `minimal`, `club`, `hard`, and `scope`
   choose practical bundles for sensitivity, thresholds, debounce, and visual
   mode.
+- `vjctl.toml` can store that setup locally. It is read before CLI overrides,
+  so a saved booth setup can still be nudged per run.
 - `--sensitivity` is the main operator-facing gate for AutoVJ. It adjusts
   confidence, onset and effect thresholds, debounce, pressure growth, wave
   strength, and phase detection as one coherent control.
@@ -380,6 +397,7 @@ automatic effects.
 The project is a small modular monolith:
 
 - `cli.py` parses user-facing commands.
+- `config.py` loads local performance config.
 - `app.py` owns terminal runtime, input polling, and the render loop.
 - `audio_input.py` reads live audio through `sounddevice`.
 - `analyzer.py` turns samples into music features and beat hints.

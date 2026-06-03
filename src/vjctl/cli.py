@@ -6,6 +6,7 @@ from dataclasses import replace
 
 from .audio_input import audio_device_lines, audio_output_lines
 from .app import render_preview, run, run_meter
+from .config import PerformanceConfig, load_performance_config
 from .music_reactor import MusicTuning
 from .performance import (
     DEFAULT_PERFORMANCE_PRESET,
@@ -23,10 +24,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--meter", action="store_true")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--lsd", action="store_true")
+    parser.add_argument("--config", default=None)
+    parser.add_argument("--no-config", action="store_true")
     parser.add_argument(
         "--preset",
         choices=tuple(PERFORMANCE_PRESETS),
-        default=DEFAULT_PERFORMANCE_PRESET,
+        default=None,
     )
     parser.add_argument("--sensitivity", type=float, default=None)
     parser.add_argument("--visual-mode", choices=("waves", "string"), default=None)
@@ -45,11 +48,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    preset_name, tuning, visual_mode = _performance(args)
     if args.list_audio_devices:
         return _list_audio_devices()
     if args.list_audio_outputs:
         return _list_audio_outputs()
+    try:
+        config = load_performance_config(args.config, args.no_config)
+        preset_name, tuning, visual_mode = _performance(args, config)
+    except RuntimeError as error:
+        sys.stderr.write(f"{error}\n")
+        return 2
     if args.meter:
         device = _audio_device(args.audio_device)
         return run_meter(
@@ -96,27 +104,51 @@ def _audio_device(value: str | None) -> str | int | None:
     return value
 
 
-def _performance(args: argparse.Namespace) -> tuple[str, MusicTuning, str]:
-    preset = performance_preset(args.preset) or PERFORMANCE_PRESETS[DEFAULT_PERFORMANCE_PRESET]
+def _performance(
+    args: argparse.Namespace,
+    config: PerformanceConfig,
+) -> tuple[str, MusicTuning, str]:
+    requested_preset = args.preset or config.preset or DEFAULT_PERFORMANCE_PRESET
+    preset = performance_preset(requested_preset)
+    if preset is None:
+        raise RuntimeError(f"Unknown performance preset: {requested_preset}")
     tuning = preset.tuning
-    overrides = {}
-    if args.sensitivity is not None:
-        overrides["sensitivity"] = _amount(args.sensitivity)
-    if args.confidence_threshold is not None:
-        overrides["confidence_threshold"] = _amount(args.confidence_threshold)
-    if args.onset_threshold is not None:
-        overrides["onset_threshold"] = _amount(args.onset_threshold)
-    if args.onset_debounce is not None:
-        overrides["onset_debounce"] = max(0.0, float(args.onset_debounce))
-    if args.effect_threshold is not None:
-        overrides["effect_threshold"] = _amount(args.effect_threshold)
-    if args.effect_debounce is not None:
-        overrides["effect_debounce"] = max(0.0, float(args.effect_debounce))
+    overrides = _config_overrides(config)
+    overrides.update(_cli_overrides(args))
     if overrides:
         tuning = replace(tuning, **overrides)
-    visual_mode = args.visual_mode or preset.visual_mode
-    preset_name = "custom" if overrides or args.visual_mode is not None else preset.name
+    visual_mode = args.visual_mode or config.visual_mode or preset.visual_mode
+    if visual_mode not in ("waves", "string"):
+        raise RuntimeError(f"Unknown visual mode: {visual_mode}")
+    custom = bool(overrides or args.visual_mode is not None or config.visual_mode is not None)
+    preset_name = "custom" if custom else preset.name
     return preset_name, tuning, visual_mode
+
+
+def _config_overrides(config: PerformanceConfig) -> dict[str, float]:
+    return {key: _tuning_value(key, value) for key, value in config.tuning.items()}
+
+
+def _cli_overrides(args: argparse.Namespace) -> dict[str, float]:
+    values = {
+        "sensitivity": args.sensitivity,
+        "confidence_threshold": args.confidence_threshold,
+        "onset_threshold": args.onset_threshold,
+        "onset_debounce": args.onset_debounce,
+        "effect_threshold": args.effect_threshold,
+        "effect_debounce": args.effect_debounce,
+    }
+    return {
+        key: _tuning_value(key, value)
+        for key, value in values.items()
+        if value is not None
+    }
+
+
+def _tuning_value(key: str, value: float) -> float:
+    if key in ("onset_debounce", "effect_debounce"):
+        return max(0.0, float(value))
+    return _amount(value)
 
 
 def _amount(value: float) -> float:

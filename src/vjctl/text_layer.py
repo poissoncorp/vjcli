@@ -31,15 +31,18 @@ class ArtText:
         model: VJModel,
         beat_time: float,
         mode: str = "hero",
-    ) -> None:
+    ) -> bool:
         width = max(8, buffer.width - 8)
         height = max(5, buffer.height - 6)
         chooser = choose_prompt_art if mode == "prompt" else choose_hero_art
         lines = chooser(text, width, height)
+        if not lines:
+            return False
         width = max(len(line) for line in lines)
         x = max(0, (buffer.width - width) // 2)
         y = max(2, (buffer.height - len(lines)) // 2)
         self.render_lines(buffer, lines, x, y, color, model, beat_time, mode)
+        return True
 
     def render_lines(
         self,
@@ -115,14 +118,24 @@ class TextLayer:
             y = max(2, buffer.height // 2)
             self._plain.render(buffer, text, x, y, color)
             return
-        self._art.render_text(buffer, overlay.text, color, model, beat_time)
+        if self._art.render_text(buffer, overlay.text, color, model, beat_time):
+            return
+        text = _clip(overlay.text, max(8, buffer.width - 8))
+        x = max(0, (buffer.width - len(text)) // 2)
+        y = max(2, buffer.height // 2)
+        self._plain.render(buffer, text, x, y, color)
 
     def prompt(self, buffer: FrameBuffer, model: VJModel, beat_time: float) -> None:
         if not model.prompt:
             return
         theme = model.visual_theme
         if not model.prompt.startswith("/"):
-            self._art.render_text(buffer, model.prompt, theme.ash, model, beat_time, "prompt")
+            if self._art.render_text(buffer, model.prompt, theme.ash, model, beat_time, "prompt"):
+                return
+            text = _clip(model.prompt, max(8, buffer.width - 8))
+            x = max(0, (buffer.width - len(text)) // 2)
+            y = min(buffer.height - 3, max(2, buffer.height // 2 + 2))
+            self._plain.render(buffer, text, x, y, theme.ash)
             return
         text = _clip(model.prompt, max(8, buffer.width - 8))
         x = max(0, (buffer.width - len(text)) // 2)
