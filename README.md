@@ -23,6 +23,8 @@ places, and usable without opening a browser or a heavyweight visual stack.
 - Auto-triggers effects `1-9` from musical features.
 - Lets AutoVJ sensitivity be tuned from calm background motion to aggressive
   room response.
+- Can switch the main motion layer between shockwaves and an audio-reactive
+  string/scope view.
 - Supports opt-in `--lsd` color profiling from the character of the track.
 - Keeps spawned waves alive until they naturally decay.
 - Renders text hits with bundled FIGlet fonts and terminal-native ANSI output.
@@ -83,6 +85,12 @@ AutoVJ plus LSD diagnostics:
 
 ```bash
 vjctl --debug --lsd
+```
+
+Audio-reactive string/scope mode:
+
+```bash
+vjctl --visual-mode string --lsd
 ```
 
 Preview one frame in a non-interactive shell:
@@ -222,6 +230,13 @@ of being used as a normal fallback.
 `0` stays manual. It is the operator's free-roam reset, not an automatic music
 decision.
 
+Visual modes are renderer-level grammars:
+
+- `waves` keeps the default autonomous shockwave layer.
+- `string` replaces the wave layer with a tension line/scope driven by audio,
+  scene pressure, hits, and LSD motion while keeping scenes, effects, text, and
+  color profiling intact.
+
 ## LSD Mode
 
 `--lsd` keeps the same control model and effect timing, but lets the track choose
@@ -323,6 +338,8 @@ waves that already spawned.
 /density <0-1|up|down>
 /sens <0-1|up|down>
 /sensitivity <0-1|up|down>
+/mode <waves|string>
+/visual <waves|string>
 /cooldown
 ```
 
@@ -330,6 +347,7 @@ waves that already spawned.
 `0.10 / 0.10`, so the room begins controlled and gets uglier only when pushed.
 `sens` controls how readily live audio becomes waves, scene pressure, and
 automatic effects.
+`mode` switches the main motion layer without restarting the app.
 
 ## Architecture
 

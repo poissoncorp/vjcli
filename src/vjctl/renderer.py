@@ -7,6 +7,7 @@ from .effect_renderers import EffectRenderers
 from .lsd_motifs import LsdMotifRenderer
 from .model import VJModel
 from .scene_renderer import SceneRenderer
+from .signal_renderer import SignalRenderer
 from .text_layer import TextLayer
 from .wave_renderer import WaveRenderer
 
@@ -19,6 +20,7 @@ class Renderer:
         self._scene = SceneRenderer()
         self._motifs = LsdMotifRenderer()
         self._waves = WaveRenderer()
+        self._signal = SignalRenderer()
         self._debug = DebugOverlay()
 
     def reset_diff(self) -> None:
@@ -30,7 +32,10 @@ class Renderer:
         self._effects.background(buffer, model, beat_time)
         self._scene.render(buffer, model, beat_time)
         self._motifs.render(buffer, model, beat_time)
-        self._waves.render(buffer, model, now)
+        if model.visual_mode == "string":
+            self._signal.render(buffer, model, beat_time)
+        else:
+            self._waves.render(buffer, model, now)
         self._effects.effects(buffer, model, beat_time)
         self._text.hud(buffer, model, beat_time)
         self._text.social(buffer, model, beat_time)

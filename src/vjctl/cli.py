@@ -18,6 +18,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--lsd", action="store_true")
     parser.add_argument("--sensitivity", type=float, default=DEFAULT_SENSITIVITY)
+    parser.add_argument("--visual-mode", choices=("waves", "string"), default="waves")
     parser.add_argument("--meter-frames", type=int, default=120, help=argparse.SUPPRESS)
     parser.add_argument("--meter-fps", type=int, default=20, help=argparse.SUPPRESS)
     parser.add_argument("--confidence-threshold", type=float, default=0.08)
@@ -51,10 +52,18 @@ def main(argv: list[str] | None = None) -> int:
                 music_tuning=tuning,
                 debug=args.debug,
                 lsd=args.lsd,
+                visual_mode=args.visual_mode,
             )
         )
         return 0
-    return run(args.music, _audio_device(args.audio_device), tuning, args.debug, args.lsd)
+    return run(
+        music=args.music,
+        audio_device=_audio_device(args.audio_device),
+        music_tuning=tuning,
+        debug=args.debug,
+        lsd=args.lsd,
+        visual_mode=args.visual_mode,
+    )
 
 
 def _audio_device(value: str | None) -> str | int | None:

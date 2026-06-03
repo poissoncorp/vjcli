@@ -51,6 +51,7 @@ def run(
     music_tuning: MusicTuning | None = None,
     debug: bool = False,
     lsd: bool = False,
+    visual_mode: str = "waves",
 ) -> int:
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         sys.stderr.write(
@@ -63,7 +64,7 @@ def run(
         sys.stderr.write(f"{error}\n")
         return 2
 
-    model = _model(music_tuning, debug, lsd)
+    model = _model(music_tuning, debug, lsd, visual_mode)
     renderer = Renderer()
     decoder = InputDecoder()
     social_source = SimulatedSocialSource()
@@ -115,8 +116,9 @@ def render_preview(
     music_tuning: MusicTuning | None = None,
     debug: bool = False,
     lsd: bool = False,
+    visual_mode: str = "waves",
 ) -> str:
-    model = _model(music_tuning, debug, lsd)
+    model = _model(music_tuning, debug, lsd, visual_mode)
     renderer = Renderer()
     social_source = SimulatedSocialSource()
     music_source = _music_source(music if music == "demo" else "none")
@@ -202,11 +204,13 @@ def _model(
     music_tuning: MusicTuning | None = None,
     debug: bool = False,
     lsd: bool = False,
+    visual_mode: str = "waves",
 ) -> VJModel:
     return VJModel(
         music_reactor=MusicReactor(music_tuning or MusicTuning()),
         debug=debug,
         lsd=lsd,
+        visual_mode=visual_mode,
     )
 
 

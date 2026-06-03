@@ -73,6 +73,7 @@ class VJModel:
     density: float = DEFAULT_DENSITY
     debug: bool = False
     lsd: bool = False
+    visual_mode: str = "waves"
     prompt: str = ""
     overlays: list[Overlay] = field(default_factory=list)
     socials: list[SocialEvent] = field(default_factory=list)
@@ -201,6 +202,8 @@ class VJModel:
             "/density": self._command_density,
             "/sens": self._command_sensitivity,
             "/sensitivity": self._command_sensitivity,
+            "/mode": self._command_visual_mode,
+            "/visual": self._command_visual_mode,
             "/cooldown": self._command_cooldown,
         }.get(name)
         if handler is not None:
@@ -396,6 +399,17 @@ class VJModel:
                 return
         self.music_reactor.tuning = replace(self.music_reactor.tuning, sensitivity=sensitivity)
         self.status = f"SENS {sensitivity:.2f}"
+
+    def _command_visual_mode(self, args: list[str]) -> None:
+        if not args:
+            self.status = f"MODE {self.visual_mode.upper()}"
+            return
+        mode = args[0].lower()
+        if mode not in ("waves", "string"):
+            self.status = "MODE ?"
+            return
+        self.visual_mode = mode
+        self.status = f"MODE {mode.upper()}"
 
     def _command_cooldown(self, args: list[str]) -> None:
         self.cooldown = max(self.cooldown, 0.01)
