@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from .clock import TempoClock
 from .effects import EFFECTS, EFFECT_BY_KEY, EffectSpec
@@ -199,6 +199,8 @@ class VJModel:
             "/aggr": self._command_aggr,
             "/dens": self._command_density,
             "/density": self._command_density,
+            "/sens": self._command_sensitivity,
+            "/sensitivity": self._command_sensitivity,
             "/cooldown": self._command_cooldown,
         }.get(name)
         if handler is not None:
@@ -375,6 +377,25 @@ class VJModel:
                 return
         self.cooldown = 0.0
         self.status = f"DENS {self.density:.2f}"
+
+    def _command_sensitivity(self, args: list[str]) -> None:
+        sensitivity = self.music_reactor.tuning.sensitivity
+        if not args:
+            self.status = f"SENS {sensitivity:.2f}"
+            return
+        value = args[0].lower()
+        if value == "up":
+            sensitivity = min(1.0, sensitivity + 0.08)
+        elif value == "down":
+            sensitivity = max(0.0, sensitivity - 0.08)
+        else:
+            try:
+                sensitivity = max(0.0, min(1.0, float(value)))
+            except ValueError:
+                self.status = "SENS ?"
+                return
+        self.music_reactor.tuning = replace(self.music_reactor.tuning, sensitivity=sensitivity)
+        self.status = f"SENS {sensitivity:.2f}"
 
     def _command_cooldown(self, args: list[str]) -> None:
         self.cooldown = max(self.cooldown, 0.01)

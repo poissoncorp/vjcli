@@ -6,6 +6,7 @@ from .music import MusicFrame
 
 DEFAULT_AGGRESSION = 0.10
 DEFAULT_DENSITY = 0.10
+DEFAULT_SENSITIVITY = 0.30
 
 SCENE_HOLD = {
     "drive": 0.34,
@@ -152,6 +153,7 @@ class MusicMood:
 
 @dataclass(frozen=True)
 class MusicTuning:
+    sensitivity: float = DEFAULT_SENSITIVITY
     confidence_threshold: float = 0.08
     onset_threshold: float = 0.64
     onset_debounce: float = 0.18
@@ -211,7 +213,7 @@ class MusicReactor:
         mood: MusicMood | None = None,
     ) -> MusicReaction:
         dt = self._frame_dt(now)
-        if frame.confidence < self.tuning.confidence_threshold:
+        if frame.confidence < _confidence_threshold(self.tuning):
             self.frames_seen = 0
             self.dynamics_ready = False
             self.last_contrast = 0.0
@@ -230,27 +232,36 @@ class MusicReactor:
         dynamics = self._update_dynamics(frame, dt)
         self._update_pressure(frame, dt, response, mood, dynamics)
         scene = self._stabilized_scene(
-            _scene(frame, self.pressure, response, mood, dynamics),
+            _scene(frame, self.pressure, response, mood, dynamics, self.tuning),
             frame,
             now,
         )
         scene_age = self._set_scene(scene, now)
         scene_entered = scene_age == 0.0
-        score = _trigger_score(frame, self.pressure, response, dynamics)
+        score = _trigger_score(frame, self.pressure, response, dynamics, self.tuning)
         transition_strength = (
-            _transition_strength(frame, scene, self.pressure, response, mood, dynamics)
+            _transition_strength(
+                frame,
+                scene,
+                self.pressure,
+                response,
+                mood,
+                dynamics,
+                self.tuning,
+            )
             if scene_entered and self.frames_seen > 1
             else None
         )
+        reaction_scale = _sensitivity_scale(self.tuning, 0.80, 1.18)
         dynamic_weight = 0.72 + dynamics.contrast * 0.42
         aggression_lift = (
             frame.drive * dynamic_weight * (0.34 + response * 0.28)
             + self.pressure * (0.14 + response * 0.14)
-        )
+        ) * reaction_scale
         density_lift = (
             frame.mass * dynamic_weight * (0.30 + response * 0.20)
             + self.pressure * (0.10 + response * 0.10)
-        )
+        ) * reaction_scale
         next_aggression = _clamp(
             max(
                 DEFAULT_AGGRESSION,
@@ -273,11 +284,12 @@ class MusicReactor:
                 score,
                 mood,
                 response,
+                dynamics,
             )
             if self.frames_seen > 1
             else None
         )
-        if frame.onset < self.tuning.onset_threshold:
+        if frame.onset < _onset_threshold(self.tuning):
             return MusicReaction(
                 next_aggression,
                 next_density,
@@ -291,7 +303,7 @@ class MusicReactor:
                 contrast=dynamics.contrast,
                 lift=dynamics.lift,
             )
-        onset_debounce = self.tuning.onset_debounce + (1.0 - response) * 0.18
+        onset_debounce = _onset_debounce(self.tuning, response)
         if now - self.last_onset_at < onset_debounce:
             return MusicReaction(
                 next_aggression,
@@ -307,7 +319,7 @@ class MusicReactor:
                 lift=dynamics.lift,
             )
 
-        strength = _wave_strength(frame, response, mood, dynamics)
+        strength = _wave_strength(frame, response, mood, dynamics, self.tuning)
         self.last_onset_at = now
         return MusicReaction(
             next_aggression,
@@ -371,6 +383,7 @@ class MusicReactor:
         )
         target *= 0.56 + response * 0.44
         target *= 0.78 + dynamics.contrast * 0.44
+        target *= _sensitivity_scale(self.tuning, 0.74, 1.28)
         target *= _mood_scale(mood, "pressure")
         speed = (3.4 + response * 3.6) if target > self.pressure else 1.2
         self.pressure = _follow(self.pressure, target, _attack(dt, speed))
@@ -396,7 +409,15 @@ class MusicReactor:
         self.baseline_drive = _baseline(self.baseline_drive, frame.drive, dt)
         self.baseline_mass = _baseline(self.baseline_mass, frame.mass, dt)
         self.baseline_change = _baseline(self.baseline_change, frame.change, dt)
-        phase = _phase(frame, contrast, lift, self.pressure, self.last_contrast, self.last_phase)
+        phase = _phase(
+            frame,
+            contrast,
+            lift,
+            self.pressure,
+            self.last_contrast,
+            self.last_phase,
+            self.tuning,
+        )
         self.last_contrast = contrast
         self.last_phase = phase
         return MusicDynamics(contrast, lift, phase)
@@ -411,8 +432,9 @@ class MusicReactor:
         score: float,
         mood: MusicMood | None,
         response: float,
+        dynamics: MusicDynamics,
     ) -> str | None:
-        debounce = self.tuning.effect_debounce + (1.0 - response) * 0.46
+        debounce = _effect_debounce(self.tuning, response)
         if mood is not None:
             debounce *= _mood_debounce_scale(mood)
             debounce *= _mood_scale(mood, "debounce")
@@ -420,7 +442,7 @@ class MusicReactor:
             debounce *= 0.62
         if now - self.last_effect_at < debounce:
             return None
-        threshold = self.tuning.effect_threshold + (1.0 - response) * 0.18
+        threshold = _effect_threshold(self.tuning, response)
         if mood is not None:
             threshold += _mood_threshold_shift(mood, scene)
             threshold += _mood_add(mood, "threshold")
@@ -429,10 +451,13 @@ class MusicReactor:
             threshold = max(0.0, threshold - 0.05 * response)
         if score < threshold:
             return None
-        self.last_effect_at = now
         key = _candidate_key(frame, scene, scene_age, self.pressure, mood)
+        key = _limit_key(key, scene, score, threshold, dynamics, mood)
+        if key is None:
+            return None
         key = self._avoid_repeat(key, scene, mood)
         self._remember_effect(key)
+        self.last_effect_at = now
         return key
 
     def _avoid_repeat(self, key: str, scene: str, mood: MusicMood | None) -> str:
@@ -456,7 +481,9 @@ def _candidate_key(
     scene_age: float,
     pressure: float,
     mood: MusicMood | None,
-) -> str:
+) -> str | None:
+    if scene in ("idle", "listen"):
+        return None
     if mood is not None:
         key = _mood_key(scene, pressure, mood)
         if key is not None:
@@ -481,6 +508,28 @@ def _candidate_key(
     if scene == "drive":
         return "3"
     return "4"
+
+
+def _limit_key(
+    key: str | None,
+    scene: str,
+    score: float,
+    threshold: float,
+    dynamics: MusicDynamics,
+    mood: MusicMood | None,
+) -> str | None:
+    if key != "4":
+        return key
+    if dynamics.phase != "hit" and scene not in ("rupture", "chaos"):
+        return _alternate_or_none(scene, key, mood)
+    if score < threshold + 0.14:
+        return _alternate_or_none(scene, key, mood)
+    return key
+
+
+def _alternate_or_none(scene: str, key: str, mood: MusicMood | None) -> str | None:
+    alternative = _alternate_key(scene, key, mood)
+    return None if alternative == key else alternative
 
 
 def _mood_key(scene: str, pressure: float, mood: MusicMood) -> str | None:
@@ -594,6 +643,7 @@ def _transition_strength(
     response: float,
     mood: MusicMood | None,
     dynamics: MusicDynamics,
+    tuning: MusicTuning,
 ) -> float | None:
     if scene in ("idle", "listen"):
         return None
@@ -609,6 +659,7 @@ def _transition_strength(
     strength = base + pressure * 0.16 + frame.change * 0.10 + frame.bass * 0.06
     strength *= 0.58 + response * 0.42
     strength *= 0.72 + dynamics.contrast * 0.42
+    strength *= _sensitivity_scale(tuning, 0.84, 1.18)
     strength *= _phase_hit_scale(dynamics.phase)
     strength *= _mood_scale(mood, "transition")
     return _clamp(strength)
@@ -642,14 +693,20 @@ def _phase(
     pressure: float,
     previous_contrast: float,
     previous_phase: str,
+    tuning: MusicTuning,
 ) -> str:
-    if contrast > 0.58 and (frame.onset > 0.50 or frame.change > 0.50):
+    sensitivity = tuning.sensitivity
+    hit_limit = 0.62 - sensitivity * 0.12
+    rise_lift = 0.34 - sensitivity * 0.10
+    rise_contrast = 0.30 - sensitivity * 0.10
+    hold_limit = 0.38 - sensitivity * 0.10
+    if contrast > hit_limit and (frame.onset > 0.50 or frame.change > 0.50):
         return "hit"
-    if lift > 0.30 or (contrast > 0.26 and contrast >= previous_contrast):
+    if lift > rise_lift or (contrast > rise_contrast and contrast >= previous_contrast):
         return "rise"
     if previous_phase in ("hit", "rise") and contrast < previous_contrast * 0.55:
         return "release"
-    if pressure > 0.34 or frame.mass > 0.58:
+    if pressure > hold_limit or frame.mass > 0.58:
         return "hold"
     return "rest"
 
@@ -680,19 +737,21 @@ def _scene(
     response: float,
     mood: MusicMood | None = None,
     dynamics: MusicDynamics = MusicDynamics(),
+    tuning: MusicTuning = MusicTuning(),
 ) -> str:
     restraint = 1.0 - response
+    sensitivity_shift = _sensitivity_shift(tuning, 0.10)
     if dynamics.phase == "warmup":
         scene = "drive" if frame.drive > 0.55 or pressure > 0.38 else "listen"
         return _mood_scene(scene, frame, pressure, mood)
     context = 1.0 - dynamics.contrast
-    rupture_change = 0.72 + restraint * 0.14 + context * 0.08
-    rupture_onset = 0.62 + restraint * 0.10 + context * 0.06
-    chaos_pressure = 0.72 + restraint * 0.14 + context * 0.06
-    chaos_drive = 0.86 + restraint * 0.08 + context * 0.04
-    weight_mass = 0.58 + restraint * 0.08 + context * 0.03
-    drive_amount = 0.42 + restraint * 0.10 + context * 0.04
-    drive_pressure = 0.38 + restraint * 0.10 + context * 0.03
+    rupture_change = 0.72 + restraint * 0.14 + context * 0.08 + sensitivity_shift
+    rupture_onset = 0.62 + restraint * 0.10 + context * 0.06 + sensitivity_shift
+    chaos_pressure = 0.72 + restraint * 0.14 + context * 0.06 + sensitivity_shift
+    chaos_drive = 0.86 + restraint * 0.08 + context * 0.04 + sensitivity_shift
+    weight_mass = 0.58 + restraint * 0.08 + context * 0.03 + sensitivity_shift
+    drive_amount = 0.42 + restraint * 0.10 + context * 0.04 + sensitivity_shift
+    drive_pressure = 0.38 + restraint * 0.10 + context * 0.03 + sensitivity_shift
     if dynamics.phase == "hit":
         rupture_change -= 0.08
         rupture_onset -= 0.06
@@ -749,6 +808,7 @@ def _trigger_score(
     pressure: float,
     response: float,
     dynamics: MusicDynamics,
+    tuning: MusicTuning,
 ) -> float:
     score = _clamp(
         max(
@@ -760,6 +820,7 @@ def _trigger_score(
         )
     )
     score *= 0.62 + dynamics.contrast * 0.54
+    score *= _sensitivity_scale(tuning, 0.84, 1.16)
     score += dynamics.lift * 0.18
     score *= _phase_hit_scale(dynamics.phase)
     return _clamp(score)
@@ -770,11 +831,13 @@ def _wave_strength(
     response: float,
     mood: MusicMood | None,
     dynamics: MusicDynamics,
+    tuning: MusicTuning,
 ) -> float:
     raw = frame.onset * 0.66 + frame.bass * 0.22 + frame.change * 0.12
     floor = 0.24 + response * 0.10
     strength = max(floor, raw * (0.56 + response * 0.44))
     strength *= 0.70 + dynamics.contrast * 0.50
+    strength *= _sensitivity_scale(tuning, 0.86, 1.16)
     strength *= _phase_hit_scale(dynamics.phase)
     return _clamp(strength * _mood_scale(mood, "wave"))
 
@@ -784,6 +847,45 @@ def _tempo_response(frame: MusicFrame) -> float:
     if frame.beat_confidence < 0.18 or bpm <= 0.0:
         return 0.78
     return 0.56 + _clamp((bpm - 104.0) / 52.0) * 0.44
+
+
+def _confidence_threshold(tuning: MusicTuning) -> float:
+    return _clamp(tuning.confidence_threshold + _sensitivity_delta(tuning) * 0.10)
+
+
+def _onset_threshold(tuning: MusicTuning) -> float:
+    return _clamp(tuning.onset_threshold + _sensitivity_delta(tuning) * 0.28)
+
+
+def _onset_debounce(tuning: MusicTuning, response: float) -> float:
+    debounce = tuning.onset_debounce + (1.0 - response) * 0.18
+    return max(0.0, debounce * _sensitivity_debounce_scale(tuning))
+
+
+def _effect_threshold(tuning: MusicTuning, response: float) -> float:
+    threshold = tuning.effect_threshold + (1.0 - response) * 0.18
+    return _clamp(threshold + _sensitivity_delta(tuning) * 0.32)
+
+
+def _effect_debounce(tuning: MusicTuning, response: float) -> float:
+    debounce = tuning.effect_debounce + (1.0 - response) * 0.46
+    return max(0.0, debounce * _sensitivity_debounce_scale(tuning))
+
+
+def _sensitivity_scale(tuning: MusicTuning, low: float, high: float) -> float:
+    return low + (high - low) * _clamp(tuning.sensitivity)
+
+
+def _sensitivity_shift(tuning: MusicTuning, amount: float) -> float:
+    return _sensitivity_delta(tuning) * amount
+
+
+def _sensitivity_debounce_scale(tuning: MusicTuning) -> float:
+    return max(0.62, 1.0 + _sensitivity_delta(tuning) * 0.9)
+
+
+def _sensitivity_delta(tuning: MusicTuning) -> float:
+    return DEFAULT_SENSITIVITY - _clamp(tuning.sensitivity)
 
 
 def _clamp(value: float) -> float:

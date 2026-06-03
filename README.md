@@ -21,6 +21,8 @@ places, and usable without opening a browser or a heavyweight visual stack.
   beat estimates, and beat phase.
 - Lets confident audio guide the free clock without taking over manual lock.
 - Auto-triggers effects `1-9` from musical features.
+- Lets AutoVJ sensitivity be tuned from calm background motion to aggressive
+  room response.
 - Supports opt-in `--lsd` color profiling from the character of the track.
 - Keeps spawned waves alive until they naturally decay.
 - Renders text hits with bundled FIGlet fonts and terminal-native ANSI output.
@@ -118,8 +120,12 @@ vjctl --meter
 Tune AutoVJ triggering:
 
 ```bash
-vjctl --onset-threshold 0.50 --effect-threshold 0.70 --debug
+vjctl --sensitivity 0.20 --debug
 ```
+
+Use `--sensitivity 0.00` for a restrained room and `--sensitivity 1.00` when
+you want the visuals to bite quickly. The lower-level threshold flags are still
+available for fine tuning.
 
 Run with live audio:
 
@@ -166,6 +172,9 @@ The model uses those values in two ways:
   whether to spawn an onset wave or fire an automatic effect from `1-9`.
   In `--lsd`, it also uses the detected character values to bias scene choice,
   effect timing, and selection.
+- `--sensitivity` is the main operator-facing gate for AutoVJ. It adjusts
+  confidence, onset and effect thresholds, debounce, pressure growth, wave
+  strength, and phase detection as one coherent control.
 - `MusicReactor` also tracks local dynamics. It compares the current frame
   against a slow baseline, so AutoVJ reacts to contrast inside the current track
   instead of treating every loud normalized input as a drop.
@@ -207,6 +216,8 @@ pressure, but automatic hits need contrast or lift relative to the recent
 baseline before they escalate.
 Energy phases then shape the decision: `rise` can build pressure, `hit` can
 fire hard, and `release` resists immediate follow-up effects.
+The full-screen slam effect is reserved for clean high-confidence hits instead
+of being used as a normal fallback.
 
 `0` stays manual. It is the operator's free-roam reset, not an automatic music
 decision.
@@ -253,8 +264,9 @@ vjctl --music demo --meter
 Columns include scene, energy phase, scene age, latest automatic effect, audio features,
 beat/phase estimates, clock phase, timing confidence, trigger decisions,
 pressure, trigger score, local dynamic contrast, local lift, transition hit
-strength, aftershock strength, beat accent, aggression, density, LSD profile,
-LSD confidence, LSD certainty, LSD margin, and LSD shift.
+strength, aftershock strength, beat accent, aggression, density, AutoVJ
+sensitivity, LSD profile, LSD confidence, LSD certainty, LSD margin, and LSD
+shift.
 
 For an in-scene readout, run:
 
@@ -309,11 +321,15 @@ waves that already spawned.
 /aggr <0-1|up|down>
 /dens <0-1|up|down>
 /density <0-1|up|down>
+/sens <0-1|up|down>
+/sensitivity <0-1|up|down>
 /cooldown
 ```
 
 `aggr` makes waves travel faster. `dens` makes waves thicker. Defaults start at
 `0.10 / 0.10`, so the room begins controlled and gets uglier only when pushed.
+`sens` controls how readily live audio becomes waves, scene pressure, and
+automatic effects.
 
 ## Architecture
 

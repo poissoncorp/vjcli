@@ -5,7 +5,7 @@ import sys
 
 from .audio_input import audio_device_lines, audio_output_lines
 from .app import render_preview, run, run_meter
-from .music_reactor import MusicTuning
+from .music_reactor import DEFAULT_SENSITIVITY, MusicTuning
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -17,6 +17,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--meter", action="store_true")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--lsd", action="store_true")
+    parser.add_argument("--sensitivity", type=float, default=DEFAULT_SENSITIVITY)
     parser.add_argument("--meter-frames", type=int, default=120, help=argparse.SUPPRESS)
     parser.add_argument("--meter-fps", type=int, default=20, help=argparse.SUPPRESS)
     parser.add_argument("--confidence-threshold", type=float, default=0.08)
@@ -66,6 +67,7 @@ def _audio_device(value: str | None) -> str | int | None:
 
 def _music_tuning(args: argparse.Namespace) -> MusicTuning:
     return MusicTuning(
+        sensitivity=_amount(args.sensitivity),
         confidence_threshold=_amount(args.confidence_threshold),
         onset_threshold=_amount(args.onset_threshold),
         onset_debounce=max(0.0, float(args.onset_debounce)),

@@ -22,7 +22,7 @@ METER_HEADER = (
     "frame scene aphase sage auto lsd lmotif lconf lcert lmargin lshift lpace "
     "limpact lweight lgrit lspark lspace lmotion energy bass high dens onset "
     "change conf bpm bphase bconf clock cphase tconf trig pressure score dyn "
-    "lift thit ahit baccent aggr mdens\n"
+    "lift thit ahit baccent aggr mdens sens\n"
 )
 
 
@@ -253,6 +253,7 @@ def _meter_line(index: int, frame: MusicFrame, model: VJModel, hit: bool) -> str
         model.beat_accent,
         model.effective_aggression,
         model.effective_density,
+        model.music_reactor.tuning.sensitivity,
     )
     fields = [
         f"{index:05d}",
