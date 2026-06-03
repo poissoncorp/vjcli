@@ -90,7 +90,19 @@ vjctl --debug --lsd
 Audio-reactive string/scope mode:
 
 ```bash
-vjctl --visual-mode string --lsd
+vjctl --preset scope --lsd
+```
+
+Quieter room response:
+
+```bash
+vjctl --preset minimal --lsd
+```
+
+Harder AutoVJ response:
+
+```bash
+vjctl --preset hard --lsd
 ```
 
 Preview one frame in a non-interactive shell:
@@ -128,12 +140,14 @@ vjctl --meter
 Tune AutoVJ triggering:
 
 ```bash
-vjctl --sensitivity 0.20 --debug
+vjctl --preset minimal --sensitivity 0.20 --debug
 ```
 
 Use `--sensitivity 0.00` for a restrained room and `--sensitivity 1.00` when
 you want the visuals to bite quickly. The lower-level threshold flags are still
 available for fine tuning.
+Any direct threshold, sensitivity, or visual-mode override is treated as a
+custom setup layered on top of the selected preset.
 
 Run with live audio:
 
@@ -180,6 +194,9 @@ The model uses those values in two ways:
   whether to spawn an onset wave or fire an automatic effect from `1-9`.
   In `--lsd`, it also uses the detected character values to bias scene choice,
   effect timing, and selection.
+- `--preset` is the fast setup layer. `minimal`, `club`, `hard`, and `scope`
+  choose practical bundles for sensitivity, thresholds, debounce, and visual
+  mode.
 - `--sensitivity` is the main operator-facing gate for AutoVJ. It adjusts
   confidence, onset and effect thresholds, debounce, pressure growth, wave
   strength, and phase detection as one coherent control.
@@ -237,6 +254,13 @@ Visual modes are renderer-level grammars:
   scene pressure, hits, and LSD motion while keeping scenes, effects, text, and
   color profiling intact.
 
+Performance presets are the first thing to reach for:
+
+- `minimal` is restrained and slow to trigger.
+- `club` is the default balanced live-audio setup.
+- `hard` lowers the gate and lets AutoVJ escalate faster.
+- `scope` switches the main motion layer to `string`.
+
 ## LSD Mode
 
 `--lsd` keeps the same control model and effect timing, but lets the track choose
@@ -276,12 +300,12 @@ vjctl --meter
 vjctl --music demo --meter
 ```
 
-Columns include scene, energy phase, scene age, latest automatic effect, audio features,
-beat/phase estimates, clock phase, timing confidence, trigger decisions,
-pressure, trigger score, local dynamic contrast, local lift, transition hit
-strength, aftershock strength, beat accent, aggression, density, AutoVJ
-sensitivity, LSD profile, LSD confidence, LSD certainty, LSD margin, and LSD
-shift.
+Columns include preset, visual mode, scene, energy phase, scene age, latest
+automatic effect, audio features, beat/phase estimates, clock phase, timing
+confidence, trigger decisions, pressure, trigger score, local dynamic contrast,
+local lift, transition hit strength, aftershock strength, beat accent,
+aggression, density, AutoVJ sensitivity, LSD profile, LSD confidence, LSD
+certainty, LSD margin, and LSD shift.
 
 For an in-scene readout, run:
 
@@ -290,11 +314,11 @@ vjctl --debug
 ```
 
 The debug overlay shows analyzer features, beat hints, clock state, scene, scene
-age, pressure, trigger score, model aggression/density, wave count, the latest
-beat accent, local dynamic contrast/lift, transition hit, aftershock strength,
-automatic effect, and active hold effects. With `--lsd`, it also shows the
-selected profile, confidence, certainty, profile margin, and motif. Stable
-profile changes also create a short LSD shift hit.
+age, pressure, trigger score, preset, visual mode, model aggression/density,
+wave count, the latest beat accent, local dynamic contrast/lift, transition hit,
+aftershock strength, automatic effect, and active hold effects. With `--lsd`,
+it also shows the selected profile, confidence, certainty, profile margin, and
+motif. Stable profile changes also create a short LSD shift hit.
 
 ## Controls
 
@@ -340,6 +364,7 @@ waves that already spawned.
 /sensitivity <0-1|up|down>
 /mode <waves|string>
 /visual <waves|string>
+/preset <minimal|club|hard|scope>
 /cooldown
 ```
 
@@ -348,6 +373,7 @@ waves that already spawned.
 `sens` controls how readily live audio becomes waves, scene pressure, and
 automatic effects.
 `mode` switches the main motion layer without restarting the app.
+`preset` swaps a whole performance bundle while the app keeps running.
 
 ## Architecture
 
@@ -358,13 +384,14 @@ The project is a small modular monolith:
 - `audio_input.py` reads live audio through `sounddevice`.
 - `analyzer.py` turns samples into music features and beat hints.
 - `music.py` defines the `MusicFrame` data contract.
+- `performance.py` defines fast operator presets.
 - `music_reactor.py` turns music frames into visual decisions.
 - `lsd.py` turns music frames into opt-in color and motion profiles.
 - `clock.py` owns free/manual/audio timing.
 - `timing.py` exposes the neutral timing state.
 - `model.py` owns scene state: waves, text, effects, music, and socials.
-- `renderer.py`, `scene_renderer.py`, `wave_renderer.py`, `effect_renderers.py`,
-  and `text_layer.py` turn model state into ANSI frames.
+- `renderer.py`, `scene_renderer.py`, `wave_renderer.py`, `signal_renderer.py`,
+  `effect_renderers.py`, and `text_layer.py` turn model state into ANSI frames.
 
 Renderer code reads state. Sources and adapters produce events or music frames.
 The model applies decisions. This keeps future inputs such as Link, deck metadata,

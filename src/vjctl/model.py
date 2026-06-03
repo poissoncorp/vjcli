@@ -9,6 +9,11 @@ from .events import SocialIncoming
 from .lsd import DEFAULT_THEME, LsdDirector, LsdTheme
 from .music import MusicFrame
 from .music_reactor import DEFAULT_AGGRESSION, DEFAULT_DENSITY, MusicMood, MusicReactor
+from .performance import (
+    CUSTOM_PERFORMANCE_PRESET,
+    DEFAULT_PERFORMANCE_PRESET,
+    performance_preset as get_performance_preset,
+)
 from .timing import TimingState
 
 
@@ -74,6 +79,7 @@ class VJModel:
     debug: bool = False
     lsd: bool = False
     visual_mode: str = "waves"
+    performance_preset: str = DEFAULT_PERFORMANCE_PRESET
     prompt: str = ""
     overlays: list[Overlay] = field(default_factory=list)
     socials: list[SocialEvent] = field(default_factory=list)
@@ -204,6 +210,7 @@ class VJModel:
             "/sensitivity": self._command_sensitivity,
             "/mode": self._command_visual_mode,
             "/visual": self._command_visual_mode,
+            "/preset": self._command_preset,
             "/cooldown": self._command_cooldown,
         }.get(name)
         if handler is not None:
@@ -361,6 +368,7 @@ class VJModel:
                 self.status = "AGGR ?"
                 return
         self.cooldown = 0.0
+        self.performance_preset = CUSTOM_PERFORMANCE_PRESET
         self.status = f"AGGR {self.aggression:.2f}"
 
     def _command_density(self, args: list[str]) -> None:
@@ -379,6 +387,7 @@ class VJModel:
                 self.status = "DENS ?"
                 return
         self.cooldown = 0.0
+        self.performance_preset = CUSTOM_PERFORMANCE_PRESET
         self.status = f"DENS {self.density:.2f}"
 
     def _command_sensitivity(self, args: list[str]) -> None:
@@ -398,6 +407,7 @@ class VJModel:
                 self.status = "SENS ?"
                 return
         self.music_reactor.tuning = replace(self.music_reactor.tuning, sensitivity=sensitivity)
+        self.performance_preset = CUSTOM_PERFORMANCE_PRESET
         self.status = f"SENS {sensitivity:.2f}"
 
     def _command_visual_mode(self, args: list[str]) -> None:
@@ -409,7 +419,22 @@ class VJModel:
             self.status = "MODE ?"
             return
         self.visual_mode = mode
+        self.performance_preset = CUSTOM_PERFORMANCE_PRESET
         self.status = f"MODE {mode.upper()}"
+
+    def _command_preset(self, args: list[str]) -> None:
+        if not args:
+            self.status = f"PRESET {self.performance_preset.upper()}"
+            return
+        preset = get_performance_preset(args[0])
+        if preset is None:
+            self.status = "PRESET ?"
+            return
+        self.music_reactor.tuning = preset.tuning
+        self.visual_mode = preset.visual_mode
+        self.performance_preset = preset.name
+        self.cooldown = 0.0
+        self.status = f"PRESET {preset.label}"
 
     def _command_cooldown(self, args: list[str]) -> None:
         self.cooldown = max(self.cooldown, 0.01)

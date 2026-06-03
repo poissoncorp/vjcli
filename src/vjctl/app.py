@@ -15,14 +15,15 @@ from .input import InputDecoder, InputEvent
 from .model import VJModel
 from .music import MusicFrame, MusicSource
 from .music_reactor import MusicReactor, MusicTuning
+from .performance import DEFAULT_PERFORMANCE_PRESET
 from .renderer import Renderer
 from .sources import SimulatedMusicSource, SimulatedSocialSource
 
 METER_HEADER = (
-    "frame scene aphase sage auto lsd lmotif lconf lcert lmargin lshift lpace "
-    "limpact lweight lgrit lspark lspace lmotion energy bass high dens onset "
-    "change conf bpm bphase bconf clock cphase tconf trig pressure score dyn "
-    "lift thit ahit baccent aggr mdens sens\n"
+    "frame preset vmode scene aphase sage auto lsd lmotif lconf lcert lmargin "
+    "lshift lpace limpact lweight lgrit lspark lspace lmotion energy bass high "
+    "dens onset change conf bpm bphase bconf clock cphase tconf trig pressure "
+    "score dyn lift thit ahit baccent aggr mdens sens\n"
 )
 
 
@@ -52,6 +53,7 @@ def run(
     debug: bool = False,
     lsd: bool = False,
     visual_mode: str = "waves",
+    performance_preset: str = DEFAULT_PERFORMANCE_PRESET,
 ) -> int:
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         sys.stderr.write(
@@ -64,7 +66,7 @@ def run(
         sys.stderr.write(f"{error}\n")
         return 2
 
-    model = _model(music_tuning, debug, lsd, visual_mode)
+    model = _model(music_tuning, debug, lsd, visual_mode, performance_preset)
     renderer = Renderer()
     decoder = InputDecoder()
     social_source = SimulatedSocialSource()
@@ -117,8 +119,9 @@ def render_preview(
     debug: bool = False,
     lsd: bool = False,
     visual_mode: str = "waves",
+    performance_preset: str = DEFAULT_PERFORMANCE_PRESET,
 ) -> str:
-    model = _model(music_tuning, debug, lsd, visual_mode)
+    model = _model(music_tuning, debug, lsd, visual_mode, performance_preset)
     renderer = Renderer()
     social_source = SimulatedSocialSource()
     music_source = _music_source(music if music == "demo" else "none")
@@ -149,6 +152,8 @@ def run_meter(
     fps: int = 20,
     music_tuning: MusicTuning | None = None,
     lsd: bool = False,
+    visual_mode: str = "waves",
+    performance_preset: str = DEFAULT_PERFORMANCE_PRESET,
 ) -> int:
     if music == "none":
         sys.stderr.write("Choose --music demo or --music audio for meter.\n")
@@ -160,7 +165,12 @@ def run_meter(
         return 2
     if source is None:
         return 2
-    model = _model(music_tuning, lsd=lsd)
+    model = _model(
+        music_tuning,
+        lsd=lsd,
+        visual_mode=visual_mode,
+        performance_preset=performance_preset,
+    )
     interval = 1.0 / max(1, fps)
     last_frame = time.monotonic()
     next_at = time.monotonic()
@@ -205,12 +215,14 @@ def _model(
     debug: bool = False,
     lsd: bool = False,
     visual_mode: str = "waves",
+    performance_preset: str = DEFAULT_PERFORMANCE_PRESET,
 ) -> VJModel:
     return VJModel(
         music_reactor=MusicReactor(music_tuning or MusicTuning()),
         debug=debug,
         lsd=lsd,
         visual_mode=visual_mode,
+        performance_preset=performance_preset,
     )
 
 
@@ -261,6 +273,8 @@ def _meter_line(index: int, frame: MusicFrame, model: VJModel, hit: bool) -> str
     )
     fields = [
         f"{index:05d}",
+        model.performance_preset,
+        model.visual_mode,
         model.auto_scene,
         model.auto_phase,
         f"{model.auto_scene_age:.3f}",

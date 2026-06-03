@@ -40,6 +40,7 @@ def _debug_lines(model: VJModel, now: float) -> list[str]:
         (
             f"MODEL A{model.effective_aggression:.2f} "
             f"D{model.effective_density:.2f} "
+            f"PRESET {model.performance_preset.upper()} "
             f"SENS {model.music_reactor.tuning.sensitivity:.2f} "
             f"MODE {model.visual_mode.upper()} "
             f"B{model.beat_accent:.2f} WAVES {len(model.waves)}"
