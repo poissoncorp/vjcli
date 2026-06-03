@@ -419,3 +419,12 @@ OSC, MIDI, or real social adapters from leaking into the renderer.
 
 Bundled FIGlet fonts `Delta_Corps_Priest_1.flf` and `Doom.flf` come from
 [xero/figlet-fonts](https://github.com/xero/figlet-fonts).
+
+## License
+
+`vjctl` is source-available under a custom performance license. You may run it,
+fork it, and use it for DJ/VJ sets, but public performance use requires visible
+fan-facing credit to `0x901507 / vjctl` or a separate written license.
+
+Forks and modifications are allowed under the same terms and include a
+grant-back to the original licensor. See [LICENSE](LICENSE).
